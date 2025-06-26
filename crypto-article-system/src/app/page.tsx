@@ -27,6 +27,8 @@ interface Topic {
   score: number
   coins: string[]
   collectedAt: string
+  source?: string
+  sourceUrl?: string
 }
 
 interface Article {
@@ -354,6 +356,11 @@ export default function Dashboard() {
                           <span className="text-sm text-slate-300 bg-slate-600 px-2 py-1 rounded">
                             📊 スコア: {topic.score}
                           </span>
+                          {topic.source && (
+                            <Badge className="bg-indigo-600 text-white font-medium">
+                              📡 {topic.source}
+                            </Badge>
+                          )}
                         </div>
                         <h3 className="font-semibold text-white text-lg mb-2">{topic.title}</h3>
                         <div className="flex items-center gap-3 mt-3">
@@ -367,6 +374,16 @@ export default function Dashboard() {
                           <span className="text-xs text-slate-400">
                             🕒 {topic.collectedAt}
                           </span>
+                          {topic.sourceUrl && (
+                            <a 
+                              href={topic.sourceUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
+                            >
+                              🔗 元記事を見る
+                            </a>
+                          )}
                         </div>
                       </div>
                       <Button 

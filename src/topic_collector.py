@@ -285,6 +285,7 @@ class PriceDataCollector:
                     change_24h = coin.get('price_change_percentage_24h', 0)
                     if abs(change_24h) >= 10:
                         movers.append({
+                            'id': coin['id'],
                             'symbol': coin['symbol'].upper(),
                             'name': coin['name'],
                             'price': coin['current_price'],
@@ -346,10 +347,14 @@ class PriceDataCollector:
         else:
             keywords.extend(["bearish", "下落"])
         
+        # CoinGeckoの詳細ページURLを生成
+        coin_id = mover.get('id', mover['name'].lower().replace(' ', '-'))
+        source_url = f"https://www.coingecko.com/ja/coins/{coin_id}"
+        
         return CollectedTopic(
             title=title,
             source=TopicSource.PRICE_API,
-            source_url=None,
+            source_url=source_url,
             priority=priority,
             coins=[mover['symbol']],
             keywords=keywords,
@@ -359,7 +364,8 @@ class PriceDataCollector:
                 'price': mover['price'],
                 'change_24h': change,
                 'volume': mover['volume'],
-                'market_cap': mover['market_cap']
+                'market_cap': mover['market_cap'],
+                'coin_id': coin_id
             },
             score=abs(change)  # 変動率をスコアとして使用
         )
@@ -368,16 +374,20 @@ class PriceDataCollector:
         """トレンドコインからトピックを作成"""
         title = f"{coin['name']}（{coin['symbol']}）が注目を集める - トレンド入り"
         
+        # CoinGeckoの詳細ページURLを生成
+        coin_id = coin.get('id', coin['name'].lower().replace(' ', '-'))
+        source_url = f"https://www.coingecko.com/ja/coins/{coin_id}"
+        
         return CollectedTopic(
             title=title,
             source=TopicSource.SOCIAL_MEDIA,
-            source_url=None,
+            source_url=source_url,
             priority=TopicPriority.HIGH,
             coins=[coin['symbol']],
             keywords=["trending", "注目", "話題", coin['name']],
             summary=f"CoinGeckoのトレンドランキングに登場。時価総額ランク: {coin.get('market_cap_rank', 'N/A')}",
             collected_at=datetime.datetime.now(),
-            data={'market_cap_rank': coin.get('market_cap_rank', 0)},
+            data={'market_cap_rank': coin.get('market_cap_rank', 0), 'coin_id': coin_id},
             score=50  # トレンド入りは高スコア
         )
 

@@ -224,13 +224,27 @@ async def get_topics(limit: int = 20, priority: Optional[str] = None):
         
         topics_data = []
         for topic in topics:
+            # ソース情報の取得
+            source_name = topic.source.value if topic.source else "unknown"
+            
+            # ソース名を日本語で表示
+            source_display = {
+                "rss_feed": "RSS配信",
+                "price_api": "価格データ",
+                "social_media": "トレンド",
+                "news_api": "ニュースAPI",
+                "onchain_data": "オンチェーンデータ"
+            }.get(source_name, source_name)
+            
             topics_data.append({
                 "id": str(hash(topic.title)),  # 簡易ID
                 "title": topic.title,
                 "priority": topic.priority.name.lower(),
                 "score": topic.score,
                 "coins": topic.coins,
-                "collectedAt": topic.collected_at.strftime("%Y-%m-%d %H:%M:%S")
+                "collectedAt": topic.collected_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "source": source_display,
+                "sourceUrl": topic.source_url
             })
         
         return {"topics": topics_data}

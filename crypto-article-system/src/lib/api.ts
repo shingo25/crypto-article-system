@@ -1,6 +1,6 @@
 // API client for backend communication
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 export class APIClient {
   private baseURL: string
@@ -52,13 +52,15 @@ export class APIClient {
   // トピック一覧の取得
   async getTopics(params?: {
     limit?: number
+    offset?: number
     priority?: string
-    status?: string
+    source?: string
   }) {
     const searchParams = new URLSearchParams()
     if (params?.limit) searchParams.set('limit', params.limit.toString())
+    if (params?.offset) searchParams.set('offset', params.offset.toString())
     if (params?.priority) searchParams.set('priority', params.priority)
-    if (params?.status) searchParams.set('status', params.status)
+    if (params?.source) searchParams.set('source', params.source)
     
     const endpoint = `/api/topics${searchParams.toString() ? `?${searchParams}` : ''}`
     return this.request<{
@@ -69,7 +71,15 @@ export class APIClient {
         score: number
         coins: string[]
         collectedAt: string
+        source?: string
+        sourceUrl?: string
       }>
+      pagination: {
+        total: number
+        offset: number
+        limit: number
+        hasMore: boolean
+      }
     }>(endpoint)
   }
 

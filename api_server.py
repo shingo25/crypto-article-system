@@ -200,8 +200,13 @@ async def run_pipeline_once():
 
 # トピック関連のエンドポイント
 @app.get("/api/topics")
-async def get_topics(limit: int = 20, priority: Optional[str] = None):
-    """トピック一覧を取得"""
+async def get_topics(
+    limit: int = 20, 
+    offset: int = 0,
+    priority: Optional[str] = None,
+    source: Optional[str] = None
+):
+    """トピック一覧を取得（ページネーション・フィルタ対応）"""
     try:
         if not topic_manager:
             return {"topics": []}
@@ -215,12 +220,31 @@ async def get_topics(limit: int = 20, priority: Optional[str] = None):
             except Exception as e:
                 logger.warning(f"Error collecting from {collector.__class__.__name__}: {e}")
         
-        # トピックを取得
-        topics = topic_manager.get_top_topics(count=limit)
+        # 全トピックを取得
+        all_topics = topic_manager.get_top_topics(count=1000)  # 大きな数で全取得
+        
+        # フィルタリング
+        filtered_topics = all_topics
         
         # 優先度でフィルタ
         if priority:
-            topics = [t for t in topics if t.priority.name.lower() == priority.lower()]
+            filtered_topics = [t for t in filtered_topics if t.priority.name.lower() == priority.lower()]
+        
+        # ソースでフィルタ
+        if source:
+            source_mapping = {
+                "rss": "rss_feed",
+                "price": "price_api", 
+                "trend": "social_media",
+                "news": "news_api",
+                "onchain": "onchain_data"
+            }
+            source_value = source_mapping.get(source.lower(), source.lower())
+            filtered_topics = [t for t in filtered_topics if t.source.value == source_value]
+        
+        # ページネーション適用
+        total_count = len(filtered_topics)
+        topics = filtered_topics[offset:offset + limit]
         
         topics_data = []
         for topic in topics:
@@ -247,7 +271,15 @@ async def get_topics(limit: int = 20, priority: Optional[str] = None):
                 "sourceUrl": topic.source_url
             })
         
-        return {"topics": topics_data}
+        return {
+            "topics": topics_data,
+            "pagination": {
+                "total": total_count,
+                "offset": offset,
+                "limit": limit,
+                "hasMore": offset + limit < total_count
+            }
+        }
         
     except Exception as e:
         logger.error(f"Error getting topics: {e}")

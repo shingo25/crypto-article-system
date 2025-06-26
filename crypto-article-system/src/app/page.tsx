@@ -53,6 +53,13 @@ export default function Dashboard() {
 
   const [recentTopics, setRecentTopics] = useState<Topic[]>([])
   const [loadingTopics, setLoadingTopics] = useState(false)
+  const [hasMoreTopics, setHasMoreTopics] = useState(true)
+  const [topicsOffset, setTopicsOffset] = useState(0)
+  const [loadingMoreTopics, setLoadingMoreTopics] = useState(false)
+  const [topicFilters, setTopicFilters] = useState({
+    priority: '',
+    source: ''
+  })
 
   const [recentArticles, setRecentArticles] = useState<Article[]>([])
 
@@ -67,6 +74,8 @@ export default function Dashboard() {
         // トピックを取得
         const topicsResponse = await apiClient.getTopics({ limit: 10 })
         setRecentTopics(topicsResponse.topics)
+        setHasMoreTopics(topicsResponse.pagination.hasMore)
+        setTopicsOffset(10)
         
         // 記事を取得
         const articlesResponse = await apiClient.getArticles({ limit: 10 })
@@ -131,13 +140,77 @@ export default function Dashboard() {
   const handleRefreshTopics = async () => {
     setLoadingTopics(true)
     try {
-      const topicsResponse = await apiClient.getTopics({ limit: 15 })
+      const topicsResponse = await apiClient.getTopics({ 
+        limit: 10,
+        offset: 0,
+        priority: topicFilters.priority || undefined,
+        source: topicFilters.source || undefined
+      })
       setRecentTopics(topicsResponse.topics)
+      setHasMoreTopics(topicsResponse.pagination.hasMore)
+      setTopicsOffset(10)
     } catch (error) {
       console.error('Failed to refresh topics:', error)
       alert('トピック更新に失敗しました')
     } finally {
       setLoadingTopics(false)
+    }
+  }
+
+  // 無限スクロール - 追加トピック読み込み
+  const loadMoreTopics = async () => {
+    if (loadingMoreTopics || !hasMoreTopics) return
+    
+    setLoadingMoreTopics(true)
+    try {
+      const topicsResponse = await apiClient.getTopics({ 
+        limit: 10,
+        offset: topicsOffset,
+        priority: topicFilters.priority || undefined,
+        source: topicFilters.source || undefined
+      })
+      
+      setRecentTopics(prev => [...prev, ...topicsResponse.topics])
+      setHasMoreTopics(topicsResponse.pagination.hasMore)
+      setTopicsOffset(prev => prev + 10)
+    } catch (error) {
+      console.error('Failed to load more topics:', error)
+    } finally {
+      setLoadingMoreTopics(false)
+    }
+  }
+
+  // フィルタ変更ハンドラ
+  const handleFilterChange = async (filterType: 'priority' | 'source', value: string) => {
+    const newFilters = { ...topicFilters, [filterType]: value }
+    setTopicFilters(newFilters)
+    
+    // フィルタ変更時はリストをリセット
+    setLoadingTopics(true)
+    try {
+      const topicsResponse = await apiClient.getTopics({ 
+        limit: 10,
+        offset: 0,
+        priority: newFilters.priority || undefined,
+        source: newFilters.source || undefined
+      })
+      setRecentTopics(topicsResponse.topics)
+      setHasMoreTopics(topicsResponse.pagination.hasMore)
+      setTopicsOffset(10)
+    } catch (error) {
+      console.error('Failed to filter topics:', error)
+    } finally {
+      setLoadingTopics(false)
+    }
+  }
+
+  // スクロールイベントハンドラ
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    const isBottom = scrollTop + clientHeight >= scrollHeight - 100 // 100px手前で発火
+    
+    if (isBottom && hasMoreTopics && !loadingMoreTopics) {
+      loadMoreTopics()
     }
   }
 
@@ -340,9 +413,44 @@ export default function Dashboard() {
                     {loadingTopics ? '🔄 更新中...' : '🔄 更新'}
                   </Button>
                 </div>
+                
+                {/* フィルタ */}
+                <div className="flex gap-4 mt-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm text-slate-300">優先度</label>
+                    <select
+                      value={topicFilters.priority}
+                      onChange={(e) => handleFilterChange('priority', e.target.value)}
+                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
+                    >
+                      <option value="">すべて</option>
+                      <option value="urgent">緊急</option>
+                      <option value="high">高</option>
+                      <option value="medium">中</option>
+                      <option value="low">低</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm text-slate-300">ソース</label>
+                    <select
+                      value={topicFilters.source}
+                      onChange={(e) => handleFilterChange('source', e.target.value)}
+                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
+                    >
+                      <option value="">すべて</option>
+                      <option value="rss">RSS配信</option>
+                      <option value="price">価格データ</option>
+                      <option value="trend">トレンド</option>
+                    </select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div 
+                  className="space-y-4 max-h-96 overflow-y-auto"
+                  onScroll={handleScroll}
+                >
                   {recentTopics.map((topic) => (
                     <div
                       key={topic.id}
@@ -394,6 +502,27 @@ export default function Dashboard() {
                       </Button>
                     </div>
                   ))}
+                  
+                  {/* 読み込み中インジケータ */}
+                  {loadingMoreTopics && (
+                    <div className="flex justify-center py-4">
+                      <div className="text-slate-400">🔄 読み込み中...</div>
+                    </div>
+                  )}
+                  
+                  {/* 全て読み込み完了メッセージ */}
+                  {!hasMoreTopics && recentTopics.length > 0 && (
+                    <div className="flex justify-center py-4">
+                      <div className="text-slate-400">✅ 全てのトピックを表示しました</div>
+                    </div>
+                  )}
+                  
+                  {/* トピックが0件の場合 */}
+                  {recentTopics.length === 0 && !loadingTopics && (
+                    <div className="flex justify-center py-8">
+                      <div className="text-slate-400">📋 条件に合うトピックが見つかりません</div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -135,38 +135,43 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* ヘッダー */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">システム設定</h1>
-            <p className="text-gray-600 mt-1">
-              API設定とシステムパラメータの管理
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              ⚙️ システム設定
+            </h1>
+            <p className="text-slate-300 mt-2 text-lg">
+              API設定とシステムパラメータの統合管理
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             {onBack && (
               <Button 
                 variant="outline" 
-                size="sm"
+                size="default"
                 onClick={onBack}
+                className="bg-slate-800 border-slate-600 text-white hover:bg-slate-700"
               >
                 🏠 ダッシュボードに戻る
               </Button>
             )}
             <Button 
               variant="outline" 
-              size="sm"
+              size="default"
               onClick={testConnections}
               disabled={testingConnections}
+              className="bg-blue-600 border-blue-500 text-white hover:bg-blue-700"
             >
               {testingConnections ? '🔄 テスト中...' : '🔍 接続テスト'}
             </Button>
             <Button 
-              size="sm"
+              size="default"
               onClick={saveConfig}
               disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white"
             >
               {loading ? '💾 保存中...' : '💾 設定を保存'}
             </Button>
@@ -182,20 +187,35 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
           </Alert>
         )}
 
-        <Tabs defaultValue="apis" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="apis">API設定</TabsTrigger>
-            <TabsTrigger value="wordpress">WordPress連携</TabsTrigger>
-            <TabsTrigger value="system">システム設定</TabsTrigger>
+        <Tabs defaultValue="apis" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-slate-600">
+            <TabsTrigger 
+              value="apis"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🤖 API設定
+            </TabsTrigger>
+            <TabsTrigger 
+              value="wordpress"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📝 WordPress連携
+            </TabsTrigger>
+            <TabsTrigger 
+              value="system"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              ⚙️ システム設定
+            </TabsTrigger>
           </TabsList>
 
           {/* API設定タブ */}
           <TabsContent value="apis" className="space-y-4">
-            <Card>
+            <Card className="bg-slate-800 border-slate-700 text-white">
               <CardHeader>
-                <CardTitle>LLM API設定</CardTitle>
-                <p className="text-sm text-gray-500">
-                  記事生成に使用するAI APIの設定
+                <CardTitle className="text-white">🤖 LLM API設定</CardTitle>
+                <p className="text-sm text-slate-400">
+                  記事生成に使用するAI APIの設定・接続状況確認
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">

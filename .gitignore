@@ -94,6 +94,14 @@ crypto-article-system/npm-debug.log*
 crypto-article-system/yarn-debug.log*
 crypto-article-system/yarn-error.log*
 
+# Keep important config files
+!crypto-article-system/package.json
+!crypto-article-system/package-lock.json
+!crypto-article-system/tsconfig.json
+!crypto-article-system/components.json
+!crypto-article-system/next-env.d.ts
+!crypto-article-system/src/lib/
+
 # Package files
 *.tar.gz
 *.zip

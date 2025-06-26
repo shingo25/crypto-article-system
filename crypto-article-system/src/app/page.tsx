@@ -50,6 +50,7 @@ export default function Dashboard() {
   })
 
   const [recentTopics, setRecentTopics] = useState<Topic[]>([])
+  const [loadingTopics, setLoadingTopics] = useState(false)
 
   const [recentArticles, setRecentArticles] = useState<Article[]>([])
 
@@ -124,6 +125,20 @@ export default function Dashboard() {
     }
   }
 
+  // トピック手動更新
+  const handleRefreshTopics = async () => {
+    setLoadingTopics(true)
+    try {
+      const topicsResponse = await apiClient.getTopics({ limit: 15 })
+      setRecentTopics(topicsResponse.topics)
+    } catch (error) {
+      console.error('Failed to refresh topics:', error)
+      alert('トピック更新に失敗しました')
+    } finally {
+      setLoadingTopics(false)
+    }
+  }
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return 'bg-red-500 text-white'
@@ -160,31 +175,36 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* ヘッダー */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              暗号通貨記事生成システム
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              🚀 暗号通貨記事生成システム
             </h1>
-            <p className="text-gray-600 mt-1">
-              システム概要とリアルタイム監視
+            <p className="text-slate-300 mt-2 text-lg">
+              AI駆動の自動記事生成・監視ダッシュボード
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button 
               variant="outline" 
-              size="sm"
+              size="default"
               onClick={() => setCurrentView(currentView === 'dashboard' ? 'settings' : 'dashboard')}
+              className="bg-slate-800 border-slate-600 text-white hover:bg-slate-700"
             >
               {currentView === 'dashboard' ? '⚙️ 設定' : '🏠 ダッシュボード'}
             </Button>
             {currentView === 'dashboard' && (
               <Button 
                 variant={systemStats.systemStatus === 'running' ? 'destructive' : 'default'}
-                size="sm"
+                size="default"
                 onClick={handleSystemControl}
+                className={systemStats.systemStatus === 'running' 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+                }
               >
                 {systemStats.systemStatus === 'running' ? '⏸️ 停止' : '▶️ 開始'}
               </Button>
@@ -194,69 +214,83 @@ export default function Dashboard() {
 
         {/* システム状況カード */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
+          <Card className={`border-0 text-white card-hover ${
+            systemStats.systemStatus === 'running' 
+              ? 'bg-gradient-to-br from-green-500 to-green-700' 
+              : 'bg-gradient-to-br from-red-500 to-red-700'
+          }`}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-medium text-white/90">
                 システム状態
               </CardTitle>
-              {systemStats.systemStatus === 'running' ? '✅' : '❌'}
+              <span className="text-3xl">
+                {systemStats.systemStatus === 'running' ? '🟢' : '🔴'}
+              </span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-bold">
                 {systemStats.systemStatus === 'running' ? '稼働中' : '停止中'}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-white/70 mt-1">
                 最終実行: {systemStats.lastRun}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-600 to-blue-800 border-0 text-white card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-medium text-blue-100">
                 本日の記事生成数
               </CardTitle>
-              📄
+              <span className="text-3xl">📝</span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-bold">
                 {systemStats.dailyQuota.used} / {systemStats.dailyQuota.total}
               </div>
-              <p className="text-xs text-gray-500">
+              <div className="w-full bg-white/20 rounded-full h-2 mt-2">
+                <div 
+                  className="bg-white h-2 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${(systemStats.dailyQuota.used / systemStats.dailyQuota.total) * 100}%` 
+                  }}
+                ></div>
+              </div>
+              <p className="text-xs text-blue-200 mt-1">
                 {Math.round((systemStats.dailyQuota.used / systemStats.dailyQuota.total) * 100)}% 使用
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-emerald-600 to-emerald-800 border-0 text-white card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-medium text-emerald-100">
                 収集トピック数
               </CardTitle>
-              📈
+              <span className="text-3xl">🎯</span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-bold">
                 {systemStats.topicsCollected}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-emerald-200 mt-1">
                 未処理トピック
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-purple-600 to-purple-800 border-0 text-white card-hover">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-medium text-purple-100">
                 処理待ち時間
               </CardTitle>
-              ⏰
+              <span className="text-3xl">⏰</span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-bold">
                 5分
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-purple-200 mt-1">
                 次回実行まで
               </p>
             </CardContent>
@@ -264,57 +298,82 @@ export default function Dashboard() {
         </div>
 
         {/* メインコンテンツ */}
-        <Tabs defaultValue="topics" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="topics">最新トピック</TabsTrigger>
-            <TabsTrigger value="articles">生成記事</TabsTrigger>
-            <TabsTrigger value="logs">ログ</TabsTrigger>
+        <Tabs defaultValue="topics" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-slate-600">
+            <TabsTrigger 
+              value="topics" 
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🎯 最新トピック
+            </TabsTrigger>
+            <TabsTrigger 
+              value="articles"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📝 生成記事
+            </TabsTrigger>
+            <TabsTrigger 
+              value="logs"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📊 ログ
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="topics" className="space-y-4">
-            <Card>
+            <Card className="bg-slate-800 border-slate-700 text-white">
               <CardHeader>
-                <CardTitle>収集済みトピック</CardTitle>
-                <p className="text-sm text-gray-500">
-                  優先度スコア順に表示
-                </p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-white">🎯 収集済みトピック</CardTitle>
+                    <p className="text-sm text-slate-400 mt-1">
+                      優先度スコア順に表示・記事生成可能
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleRefreshTopics}
+                    disabled={loadingTopics}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {loadingTopics ? '🔄 更新中...' : '🔄 更新'}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {recentTopics.map((topic) => (
                     <div
                       key={topic.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      className="flex items-center justify-between p-6 bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-600 transition-all duration-200"
                     >
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={getPriorityColor(topic.priority)}>
-                            {topic.priority}
+                        <div className="flex items-center gap-3 mb-3">
+                          <Badge className={`${getPriorityColor(topic.priority)} font-semibold`}>
+                            {topic.priority.toUpperCase()}
                           </Badge>
-                          <span className="text-sm text-gray-500">
-                            スコア: {topic.score}
+                          <span className="text-sm text-slate-300 bg-slate-600 px-2 py-1 rounded">
+                            📊 スコア: {topic.score}
                           </span>
                         </div>
-                        <h3 className="font-medium">{topic.title}</h3>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="flex gap-1">
+                        <h3 className="font-semibold text-white text-lg mb-2">{topic.title}</h3>
+                        <div className="flex items-center gap-3 mt-3">
+                          <div className="flex gap-2">
                             {topic.coins.map((coin) => (
-                              <Badge key={coin} variant="outline">
-                                {coin}
+                              <Badge key={coin} className="bg-yellow-600 text-white font-medium">
+                                💰 {coin}
                               </Badge>
                             ))}
                           </div>
-                          <span className="text-xs text-gray-500">
-                            {topic.collectedAt}
+                          <span className="text-xs text-slate-400">
+                            🕒 {topic.collectedAt}
                           </span>
                         </div>
                       </div>
                       <Button 
-                        variant="outline" 
-                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2"
                         onClick={() => handleGenerateArticle(topic.id)}
                       >
-                        記事生成
+                        ✨ 記事生成
                       </Button>
                     </div>
                   ))}
@@ -324,11 +383,11 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="articles" className="space-y-4">
-            <Card>
+            <Card className="bg-slate-800 border-slate-700 text-white">
               <CardHeader>
-                <CardTitle>生成記事一覧</CardTitle>
-                <p className="text-sm text-gray-500">
-                  最近生成された記事
+                <CardTitle className="text-white">📝 生成記事一覧</CardTitle>
+                <p className="text-sm text-slate-400">
+                  最近生成された記事・編集・プレビュー可能
                 </p>
               </CardHeader>
               <CardContent>
@@ -336,40 +395,40 @@ export default function Dashboard() {
                   {recentArticles.map((article) => (
                     <div
                       key={article.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      className="flex items-center justify-between p-6 bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-600 transition-all duration-200"
                     >
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={getStatusColor(article.status)}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <Badge className={`${getStatusColor(article.status)} font-semibold`}>
                             {article.status}
                           </Badge>
-                          <Badge variant="outline">
+                          <Badge className="bg-purple-600 text-white font-medium">
                             {getTypeLabel(article.type)}
                           </Badge>
-                          <span className="text-sm text-gray-500">
-                            {article.wordCount}文字
+                          <span className="text-sm text-slate-300 bg-slate-600 px-2 py-1 rounded">
+                            📄 {article.wordCount}文字
                           </span>
                         </div>
-                        <h3 className="font-medium">{article.title}</h3>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="flex gap-1">
+                        <h3 className="font-semibold text-white text-lg mb-2">{article.title}</h3>
+                        <div className="flex items-center gap-3 mt-3">
+                          <div className="flex gap-2">
                             {article.coins.map((coin) => (
-                              <Badge key={coin} variant="outline">
-                                {coin}
+                              <Badge key={coin} className="bg-yellow-600 text-white font-medium">
+                                💰 {coin}
                               </Badge>
                             ))}
                           </div>
-                          <span className="text-xs text-gray-500">
-                            {article.generatedAt}
+                          <span className="text-xs text-slate-400">
+                            🕒 {article.generatedAt}
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          プレビュー
+                      <div className="flex gap-3">
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                          👁️ プレビュー
                         </Button>
-                        <Button variant="outline" size="sm">
-                          編集
+                        <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+                          ✏️ 編集
                         </Button>
                       </div>
                     </div>
@@ -380,20 +439,50 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-4">
-            <Card>
+            <Card className="bg-slate-800 border-slate-700 text-white">
               <CardHeader>
-                <CardTitle>システムログ</CardTitle>
-                <p className="text-sm text-gray-500">
-                  リアルタイムシステム情報
+                <CardTitle className="text-white">📊 システムログ</CardTitle>
+                <p className="text-sm text-slate-400">
+                  リアルタイムシステム監視・動作履歴
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="bg-black text-green-400 p-4 rounded font-mono text-sm h-96 overflow-y-auto">
-                  <div>[2024-01-26 14:30:15] INFO: 記事生成を開始しました</div>
-                  <div>[2024-01-26 14:30:12] INFO: トピック収集が完了しました (45件)</div>
-                  <div>[2024-01-26 14:30:10] INFO: RSS フィードから新しいトピックを検出</div>
-                  <div>[2024-01-26 14:30:05] INFO: 価格データを更新しました</div>
-                  <div>[2024-01-26 14:30:00] INFO: システム正常稼働中</div>
+                <div className="bg-slate-900 text-green-400 p-6 rounded-lg font-mono text-sm h-96 overflow-y-auto border-2 border-slate-600">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:30:15]</span>
+                    <span className="text-green-500 font-bold">INFO:</span>
+                    <span>🚀 記事生成を開始しました</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:30:12]</span>
+                    <span className="text-green-500 font-bold">INFO:</span>
+                    <span>📋 トピック収集が完了しました (45件)</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:30:10]</span>
+                    <span className="text-green-500 font-bold">INFO:</span>
+                    <span>🔍 RSS フィードから新しいトピックを検出</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:30:05]</span>
+                    <span className="text-green-500 font-bold">INFO:</span>
+                    <span>💰 価格データを更新しました</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:30:00]</span>
+                    <span className="text-green-500 font-bold">INFO:</span>
+                    <span>✅ システム正常稼働中</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:29:55]</span>
+                    <span className="text-yellow-500 font-bold">WARN:</span>
+                    <span>⚠️ OpenAI API レート制限に接近</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-400">[2024-01-26 14:29:50]</span>
+                    <span className="text-green-500 font-bold">INFO:</span>
+                    <span>🔄 WordPress接続テスト成功</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

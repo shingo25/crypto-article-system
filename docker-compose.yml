@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # メインアプリケーション
+  app:
+    build: .
+    container_name: crypto-article-generator
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - WORDPRESS_URL=${WORDPRESS_URL}
+      - WORDPRESS_USERNAME=${WORDPRESS_USERNAME}
+      - WORDPRESS_APP_PASSWORD=${WORDPRESS_APP_PASSWORD}
+      - COINMARKETCAP_API_KEY=${COINMARKETCAP_API_KEY}
+      - DATABASE_URL=postgresql://user:password@postgres:5432/crypto_articles
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    command: python run_pipeline.py --once  # デフォルトは1回実行
+
+  # ワーカー（Celery）
+  worker:
+    build: .
+    container_name: crypto-article-worker
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DATABASE_URL=postgresql://user:password@postgres:5432/crypto_articles
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A tasks worker --loglevel=info
+
+  # スケジューラー（Celery Beat）
+  scheduler:
+    build: .
+    container_name: crypto-article-scheduler
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/crypto_articles
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A tasks beat --loglevel=info
+
+  # PostgreSQLデータベース
+  postgres:
+    image: postgres:15-alpine
+    container_name: crypto-article-postgres
+    environment:
+      - POSTGRES_DB=crypto_articles
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # Redis（キャッシュ・キュー）
+  redis:
+    image: redis:7-alpine
+    container_name: crypto-article-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # 管理画面（FastAPI）
+  admin:
+    build: .
+    container_name: crypto-article-admin
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/crypto_articles
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    command: uvicorn admin_api:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+  redis_data:

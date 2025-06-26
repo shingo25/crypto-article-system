@@ -1,0 +1,99 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Environment Variables
+.env
+.env.local
+.env.production
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+output/logs/
+
+# Generated Articles
+output/articles/
+output/demo_output/
+*.html
+*.json
+collected_topics.json
+analyzed_topics.json
+fact_check_results.json
+published_articles.jsonl
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Database
+*.db
+*.sqlite3
+
+# API Keys and Secrets
+secrets/
+credentials/
+
+# Backup files
+*.bak
+*.backup
+
+# Node.js (Frontend)
+crypto-article-system/node_modules/
+crypto-article-system/.next/
+crypto-article-system/out/
+crypto-article-system/.env.local
+crypto-article-system/.env.development.local
+crypto-article-system/.env.test.local
+crypto-article-system/.env.production.local
+crypto-article-system/npm-debug.log*
+crypto-article-system/yarn-debug.log*
+crypto-article-system/yarn-error.log*
+
+# Package files
+*.tar.gz
+*.zip

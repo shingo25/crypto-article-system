@@ -1,6 +1,6 @@
 // API client for backend communication
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export class APIClient {
   private baseURL: string
@@ -20,6 +20,7 @@ export class APIClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      signal: AbortSignal.timeout(30000), // 30秒タイムアウト
       ...options,
     }
 
@@ -27,13 +28,25 @@ export class APIClient {
       const response = await fetch(url, config)
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          if (errorData.detail) {
+            errorMessage += ` - ${errorData.detail}`
+          }
+        } catch {
+          // JSON解析失敗時は元のメッセージを使用
+        }
+        throw new Error(errorMessage)
       }
       
       const data = await response.json()
       return data
     } catch (error) {
       console.error('API request failed:', error)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('サーバーに接続できません。APIサーバーが起動しているか確認してください。')
+      }
       throw error
     }
   }
@@ -55,12 +68,16 @@ export class APIClient {
     offset?: number
     priority?: string
     source?: string
+    sortBy?: string
+    force_refresh?: boolean
   }) {
     const searchParams = new URLSearchParams()
     if (params?.limit) searchParams.set('limit', params.limit.toString())
     if (params?.offset) searchParams.set('offset', params.offset.toString())
     if (params?.priority) searchParams.set('priority', params.priority)
     if (params?.source) searchParams.set('source', params.source)
+    if (params?.sortBy) searchParams.set('sortBy', params.sortBy)
+    if (params?.force_refresh) searchParams.set('force_refresh', 'true')
     
     const endpoint = `/api/topics${searchParams.toString() ? `?${searchParams}` : ''}`
     return this.request<{
@@ -125,6 +142,66 @@ export class APIClient {
         topicId,
         ...options
       })
+    })
+  }
+
+  // 記事生成（詳細設定版）
+  async generateArticleWithConfig(config: any) {
+    return this.request<{
+      success: boolean
+      articleId?: string
+      message: string
+    }>('/api/articles/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        topicId: config.topicId,
+        type: config.articleType,
+        depth: config.depth,
+        keywords: config.keywords,
+        wordCount: config.wordCount,
+        tone: config.tone,
+        includeImages: config.includeImages,
+        includeCharts: config.includeCharts,
+        includeSources: config.includeSources,
+        customInstructions: config.customInstructions
+      })
+    })
+  }
+
+  // トピック更新
+  async updateTopic(topicId: string, updates: any) {
+    return this.request(`/api/topics/${topicId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    })
+  }
+
+  // トピック削除
+  async deleteTopic(topicId: string) {
+    return this.request(`/api/topics/${topicId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  // 記事更新
+  async updateArticle(articleId: string, updates: any) {
+    return this.request(`/api/articles/${articleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    })
+  }
+
+  // 記事削除
+  async deleteArticle(articleId: string) {
+    return this.request(`/api/articles/${articleId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  // 記事公開
+  async publishArticle(articleId: string) {
+    return this.request(`/api/articles/${articleId}/publish`, {
+      method: 'POST'
     })
   }
 

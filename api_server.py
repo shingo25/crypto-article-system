@@ -34,6 +34,11 @@ article_generator: Optional[CryptoArticleGenerator] = None
 fact_checker: Optional[FactChecker] = None
 wordpress_client: Optional[WordPressClient] = None
 
+# キャッシュ管理
+import time
+last_topic_collection = 0
+TOPIC_COLLECTION_INTERVAL = 300  # 5分間隔でトピック収集
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """アプリケーションの起動・終了時の処理"""
@@ -96,6 +101,12 @@ class ArticleGenerationRequest(BaseModel):
     type: Optional[str] = None
     depth: Optional[str] = None
     keywords: Optional[List[str]] = None
+    wordCount: Optional[int] = 1000
+    tone: Optional[str] = "professional"
+    includeImages: Optional[bool] = True
+    includeCharts: Optional[bool] = True
+    includeSources: Optional[bool] = True
+    customInstructions: Optional[str] = None
 
 class WordPressConfigRequest(BaseModel):
     url: str
@@ -204,21 +215,37 @@ async def get_topics(
     limit: int = 20, 
     offset: int = 0,
     priority: Optional[str] = None,
-    source: Optional[str] = None
+    source: Optional[str] = None,
+    sortBy: Optional[str] = None,
+    force_refresh: bool = False
 ):
     """トピック一覧を取得（ページネーション・フィルタ対応）"""
     try:
         if not topic_manager:
             return {"topics": []}
         
-        # 最新のトピックを収集
-        collectors = [RSSFeedCollector(), PriceDataCollector()]
-        for collector in collectors:
+        # 最新のトピックを収集（キャッシュ機能付き）
+        global last_topic_collection
+        current_time = time.time()
+        
+        if force_refresh or current_time - last_topic_collection > TOPIC_COLLECTION_INTERVAL:
             try:
-                new_topics = collector.collect()
-                topic_manager.add_topics(new_topics[:5])  # 最新5件のみ追加
+                logger.info("Collecting new topics...")
+                collectors = [RSSFeedCollector(), PriceDataCollector()]
+                for collector in collectors:
+                    try:
+                        logger.info(f"Collecting from {collector.__class__.__name__}...")
+                        new_topics = collector.collect()
+                        topic_manager.add_topics(new_topics[:5])  # 最新5件のみ追加
+                        logger.info(f"Successfully collected {len(new_topics)} topics from {collector.__class__.__name__}")
+                    except Exception as e:
+                        logger.warning(f"Error collecting from {collector.__class__.__name__}: {e}")
+                last_topic_collection = current_time
+                logger.info("Topic collection completed and cached")
             except Exception as e:
-                logger.warning(f"Error collecting from {collector.__class__.__name__}: {e}")
+                logger.error(f"Error in topic collection process: {e}")
+        else:
+            logger.info("Using cached topics (collection interval not reached)")
         
         # 全トピックを取得
         all_topics = topic_manager.get_top_topics(count=1000)  # 大きな数で全取得
@@ -241,6 +268,17 @@ async def get_topics(
             }
             source_value = source_mapping.get(source.lower(), source.lower())
             filtered_topics = [t for t in filtered_topics if t.source.value == source_value]
+        
+        # ソート機能を適用
+        if sortBy == 'time':
+            # 更新時間順（新しい順）
+            filtered_topics = sorted(filtered_topics, key=lambda x: x.collected_at, reverse=True)
+        elif sortBy == 'title':
+            # タイトル順（アルファベット順）
+            filtered_topics = sorted(filtered_topics, key=lambda x: x.title.lower())
+        else:
+            # デフォルト: スコア順（高い順）
+            filtered_topics = sorted(filtered_topics, key=lambda x: x.score, reverse=True)
         
         # ページネーション適用
         total_count = len(filtered_topics)
@@ -283,6 +321,70 @@ async def get_topics(
         
     except Exception as e:
         logger.error(f"Error getting topics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/topics/{topic_id}")
+async def update_topic(topic_id: str, updates: dict):
+    """トピックを更新"""
+    try:
+        if not topic_manager:
+            raise HTTPException(status_code=500, detail="Topic manager not initialized")
+        
+        # トピックを検索
+        topic_found = None
+        for topic in topic_manager.topics:
+            if str(hash(topic.title)) == topic_id:
+                topic_found = topic
+                break
+        
+        if not topic_found:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        
+        # 更新可能なフィールドのみ適用
+        if 'title' in updates:
+            topic_found.title = updates['title']
+        if 'priority' in updates:
+            # 優先度を変更
+            from src.topic_collector import Priority
+            for priority in Priority:
+                if priority.name.lower() == updates['priority'].lower():
+                    topic_found.priority = priority
+                    break
+        if 'score' in updates:
+            topic_found.score = float(updates['score'])
+        
+        return {"success": True, "message": "Topic updated successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error updating topic: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/topics/{topic_id}")
+async def delete_topic(topic_id: str):
+    """トピックを削除"""
+    try:
+        if not topic_manager:
+            raise HTTPException(status_code=500, detail="Topic manager not initialized")
+        
+        # トピックを検索
+        topic_found = None
+        topic_index = -1
+        for i, topic in enumerate(topic_manager.topics):
+            if str(hash(topic.title)) == topic_id:
+                topic_found = topic
+                topic_index = i
+                break
+        
+        if not topic_found:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        
+        # トピックを削除
+        topic_manager.topics.pop(topic_index)
+        
+        return {"success": True, "message": "Topic deleted successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting topic: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # 記事関連のエンドポイント
@@ -330,6 +432,135 @@ async def get_articles(limit: int = 20, status: Optional[str] = None, type: Opti
         logger.error(f"Error getting articles: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/articles/{article_id}/content")
+async def get_article_content(article_id: str):
+    """記事のコンテンツを取得"""
+    try:
+        articles_dir = "./output/articles"
+        html_path = os.path.join(articles_dir, f"{article_id}.html")
+        
+        if not os.path.exists(html_path):
+            raise HTTPException(status_code=404, detail="Article not found")
+        
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # HTMLからテキストを抽出（BeautifulSoupが利用可能な場合）
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+            text_content = soup.get_text()
+        except ImportError:
+            # BeautifulSoupが利用できない場合は簡易的にHTMLタグを除去
+            import re
+            text_content = re.sub('<[^<]+?>', '', html_content)
+        
+        return {
+            "content": text_content,
+            "htmlContent": html_content
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting article content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/articles/{article_id}")
+async def update_article(article_id: str, updates: dict):
+    """記事を更新"""
+    try:
+        articles_dir = "./output/articles"
+        meta_file = f"{article_id}_meta.json"
+        meta_path = os.path.join(articles_dir, meta_file)
+        
+        if not os.path.exists(meta_path):
+            raise HTTPException(status_code=404, detail="Article not found")
+        
+        # メタデータを読み込み
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        # 更新可能なフィールドのみ適用
+        if 'title' in updates:
+            if 'article' not in metadata:
+                metadata['article'] = {}
+            metadata['article']['title'] = updates['title']
+        if 'type' in updates:
+            if 'article' not in metadata:
+                metadata['article'] = {}
+            metadata['article']['type'] = updates['type']
+        if 'status' in updates:
+            if 'article' not in metadata:
+                metadata['article'] = {}
+            metadata['article']['status'] = updates['status']
+        
+        # メタデータを保存
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        
+        return {"success": True, "message": "Article updated successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error updating article: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/articles/{article_id}")
+async def delete_article(article_id: str):
+    """記事を削除"""
+    try:
+        articles_dir = "./output/articles"
+        html_path = os.path.join(articles_dir, f"{article_id}.html")
+        meta_path = os.path.join(articles_dir, f"{article_id}_meta.json")
+        
+        # ファイルを削除
+        if os.path.exists(html_path):
+            os.remove(html_path)
+        if os.path.exists(meta_path):
+            os.remove(meta_path)
+        
+        return {"success": True, "message": "Article deleted successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting article: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/articles/{article_id}/publish")
+async def publish_article(article_id: str):
+    """記事をWordPressに公開"""
+    try:
+        if not wordpress_client:
+            raise HTTPException(status_code=500, detail="WordPress client not initialized")
+        
+        articles_dir = "./output/articles"
+        html_path = os.path.join(articles_dir, f"{article_id}.html")
+        meta_path = os.path.join(articles_dir, f"{article_id}_meta.json")
+        
+        if not os.path.exists(html_path) or not os.path.exists(meta_path):
+            raise HTTPException(status_code=404, detail="Article not found")
+        
+        # 記事コンテンツとメタデータを読み込み
+        with open(html_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        # WordPressに投稿
+        title = metadata.get('article', {}).get('title', 'Untitled')
+        wordpress_client.publish_article(title, content)
+        
+        # ステータスを更新
+        if 'article' not in metadata:
+            metadata['article'] = {}
+        metadata['article']['status'] = 'published'
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        
+        return {"success": True, "message": "Article published successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error publishing article: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/articles/generate")
 async def generate_article(request: ArticleGenerationRequest, background_tasks: BackgroundTasks):
     """記事を生成"""
@@ -353,7 +584,13 @@ async def generate_article(request: ArticleGenerationRequest, background_tasks: 
             topic_found,
             request.type,
             request.depth,
-            request.keywords
+            request.keywords,
+            request.wordCount,
+            request.tone,
+            request.includeImages,
+            request.includeCharts,
+            request.includeSources,
+            request.customInstructions
         )
         
         return {
@@ -366,7 +603,18 @@ async def generate_article(request: ArticleGenerationRequest, background_tasks: 
         logger.error(f"Error generating article: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def generate_article_background(topic, article_type=None, depth=None, keywords=None):
+async def generate_article_background(
+    topic, 
+    article_type=None, 
+    depth=None, 
+    keywords=None,
+    word_count=1000,
+    tone="professional",
+    include_images=True,
+    include_charts=True,
+    include_sources=True,
+    custom_instructions=None
+):
     """記事生成のバックグラウンドタスク"""
     try:
         # ArticleTopicに変換

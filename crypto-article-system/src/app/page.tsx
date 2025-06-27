@@ -7,6 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { apiClient } from '@/lib/api'
 import SettingsPage from '@/components/SettingsPage'
+import ArticleGenerationForm, { ArticleConfig } from '@/components/ArticleGenerationForm'
+import TopicManagement from '@/components/TopicManagement'
+import ArticlePreview from '@/components/ArticlePreview'
 
 // モックデータの型定義
 interface SystemStats {
@@ -58,7 +61,8 @@ export default function Dashboard() {
   const [loadingMoreTopics, setLoadingMoreTopics] = useState(false)
   const [topicFilters, setTopicFilters] = useState({
     priority: '',
-    source: ''
+    source: '',
+    sortBy: 'score' // 'score', 'time', 'title'
   })
 
   const [recentArticles, setRecentArticles] = useState<Article[]>([])
@@ -72,7 +76,10 @@ export default function Dashboard() {
         setSystemStats(stats)
         
         // トピックを取得
-        const topicsResponse = await apiClient.getTopics({ limit: 10 })
+        const topicsResponse = await apiClient.getTopics({ 
+          limit: 10,
+          sortBy: 'score' // デフォルトはスコア順
+        })
         setRecentTopics(topicsResponse.topics)
         setHasMoreTopics(topicsResponse.pagination.hasMore)
         setTopicsOffset(10)
@@ -119,7 +126,7 @@ export default function Dashboard() {
     }
   }
 
-  // 記事生成
+  // 記事生成（簡易版）
   const handleGenerateArticle = async (topicId: string) => {
     try {
       await apiClient.generateArticle(topicId)
@@ -136,6 +143,23 @@ export default function Dashboard() {
     }
   }
 
+  // 記事生成（詳細設定版）
+  const handleGenerateArticleWithConfig = async (config: ArticleConfig) => {
+    try {
+      await apiClient.generateArticleWithConfig(config)
+      alert('記事生成を開始しました')
+      
+      // 記事一覧を再取得（少し待ってから）
+      setTimeout(async () => {
+        const articlesResponse = await apiClient.getArticles({ limit: 10 })
+        setRecentArticles(articlesResponse.articles)
+      }, 2000)
+    } catch (error) {
+      console.error('Failed to generate article with config:', error)
+      throw error
+    }
+  }
+
   // トピック手動更新
   const handleRefreshTopics = async () => {
     setLoadingTopics(true)
@@ -144,14 +168,18 @@ export default function Dashboard() {
         limit: 10,
         offset: 0,
         priority: topicFilters.priority || undefined,
-        source: topicFilters.source || undefined
+        source: topicFilters.source || undefined,
+        sortBy: topicFilters.sortBy,
+        force_refresh: true  // 手動更新時は強制的に最新データを取得
       })
       setRecentTopics(topicsResponse.topics)
       setHasMoreTopics(topicsResponse.pagination.hasMore)
       setTopicsOffset(10)
     } catch (error) {
       console.error('Failed to refresh topics:', error)
-      alert('トピック更新に失敗しました')
+      // より詳細なエラー情報を表示
+      const errorMessage = error instanceof Error ? error.message : 'トピック更新に失敗しました'
+      alert(`エラー: ${errorMessage}`)
     } finally {
       setLoadingTopics(false)
     }
@@ -167,7 +195,8 @@ export default function Dashboard() {
         limit: 10,
         offset: topicsOffset,
         priority: topicFilters.priority || undefined,
-        source: topicFilters.source || undefined
+        source: topicFilters.source || undefined,
+        sortBy: topicFilters.sortBy
       })
       
       setRecentTopics(prev => [...prev, ...topicsResponse.topics])
@@ -175,33 +204,42 @@ export default function Dashboard() {
       setTopicsOffset(prev => prev + 10)
     } catch (error) {
       console.error('Failed to load more topics:', error)
+      const errorMessage = error instanceof Error ? error.message : '追加トピック読み込みに失敗しました'
+      alert(`エラー: ${errorMessage}`)
     } finally {
       setLoadingMoreTopics(false)
     }
   }
 
-  // フィルタ変更ハンドラ
-  const handleFilterChange = async (filterType: 'priority' | 'source', value: string) => {
+  // フィルタ変更ハンドラ（デバウンス機能付き）
+  const handleFilterChange = async (filterType: 'priority' | 'source' | 'sortBy', value: string) => {
     const newFilters = { ...topicFilters, [filterType]: value }
     setTopicFilters(newFilters)
     
-    // フィルタ変更時はリストをリセット
-    setLoadingTopics(true)
-    try {
-      const topicsResponse = await apiClient.getTopics({ 
-        limit: 10,
-        offset: 0,
-        priority: newFilters.priority || undefined,
-        source: newFilters.source || undefined
-      })
-      setRecentTopics(topicsResponse.topics)
-      setHasMoreTopics(topicsResponse.pagination.hasMore)
-      setTopicsOffset(10)
-    } catch (error) {
-      console.error('Failed to filter topics:', error)
-    } finally {
-      setLoadingTopics(false)
-    }
+    // 短時間で連続して呼ばれないようにデバウンス
+    setTimeout(async () => {
+      if (loadingTopics) return // 既に読み込み中の場合はスキップ
+      
+      setLoadingTopics(true)
+      try {
+        const topicsResponse = await apiClient.getTopics({ 
+          limit: 10,
+          offset: 0,
+          priority: newFilters.priority || undefined,
+          source: newFilters.source || undefined,
+          sortBy: newFilters.sortBy
+        })
+        setRecentTopics(topicsResponse.topics)
+        setHasMoreTopics(topicsResponse.pagination.hasMore)
+        setTopicsOffset(10)
+      } catch (error) {
+        console.error('Failed to filter topics:', error)
+        const errorMessage = error instanceof Error ? error.message : 'フィルタリングに失敗しました'
+        alert(`エラー: ${errorMessage}`)
+      } finally {
+        setLoadingTopics(false)
+      }
+    }, 300) // 300ms遅延
   }
 
   // スクロールイベントハンドラ
@@ -211,6 +249,82 @@ export default function Dashboard() {
     
     if (isBottom && hasMoreTopics && !loadingMoreTopics) {
       loadMoreTopics()
+    }
+  }
+
+  // トピック管理のハンドラー
+  const handleUpdateTopic = async (topicId: string, updates: Partial<Topic>) => {
+    try {
+      await apiClient.updateTopic(topicId, updates)
+      // トピックリストを再取得
+      const topicsResponse = await apiClient.getTopics({ limit: 50 })
+      setRecentTopics(topicsResponse.topics)
+    } catch (error) {
+      console.error('Failed to update topic:', error)
+      throw error
+    }
+  }
+
+  const handleDeleteTopic = async (topicId: string) => {
+    try {
+      await apiClient.deleteTopic(topicId)
+      // トピックリストを再取得
+      const topicsResponse = await apiClient.getTopics({ limit: 50 })
+      setRecentTopics(topicsResponse.topics)
+    } catch (error) {
+      console.error('Failed to delete topic:', error)
+      throw error
+    }
+  }
+
+  const handleRefreshTopicsManagement = async () => {
+    await handleRefreshTopics()
+  }
+
+  // 記事管理のハンドラー
+  const handleUpdateArticle = async (articleId: string, updates: Partial<Article>) => {
+    try {
+      await apiClient.updateArticle(articleId, updates)
+      // 記事リストを再取得
+      const articlesResponse = await apiClient.getArticles({ limit: 50 })
+      setRecentArticles(articlesResponse.articles)
+    } catch (error) {
+      console.error('Failed to update article:', error)
+      throw error
+    }
+  }
+
+  const handleDeleteArticle = async (articleId: string) => {
+    try {
+      await apiClient.deleteArticle(articleId)
+      // 記事リストを再取得
+      const articlesResponse = await apiClient.getArticles({ limit: 50 })
+      setRecentArticles(articlesResponse.articles)
+    } catch (error) {
+      console.error('Failed to delete article:', error)
+      throw error
+    }
+  }
+
+  const handlePublishArticle = async (articleId: string) => {
+    try {
+      await apiClient.publishArticle(articleId)
+      // 記事リストを再取得
+      const articlesResponse = await apiClient.getArticles({ limit: 50 })
+      setRecentArticles(articlesResponse.articles)
+    } catch (error) {
+      console.error('Failed to publish article:', error)
+      throw error
+    }
+  }
+
+  const handleRefreshArticles = async () => {
+    try {
+      const articlesResponse = await apiClient.getArticles({ limit: 50 })
+      setRecentArticles(articlesResponse.articles)
+    } catch (error) {
+      console.error('Failed to refresh articles:', error)
+      throw error
     }
   }
 
@@ -374,7 +488,7 @@ export default function Dashboard() {
 
         {/* メインコンテンツ */}
         <Tabs defaultValue="topics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-slate-600">
+          <TabsList className="grid w-full grid-cols-5 bg-slate-800 border-slate-600">
             <TabsTrigger 
               value="topics" 
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -386,6 +500,18 @@ export default function Dashboard() {
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
               📝 生成記事
+            </TabsTrigger>
+            <TabsTrigger 
+              value="generate"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              ✨ 記事生成
+            </TabsTrigger>
+            <TabsTrigger 
+              value="manage"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🔧 トピック管理
             </TabsTrigger>
             <TabsTrigger 
               value="logs"
@@ -444,11 +570,24 @@ export default function Dashboard() {
                       <option value="trend">トレンド</option>
                     </select>
                   </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm text-slate-300">並び順</label>
+                    <select
+                      value={topicFilters.sortBy}
+                      onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
+                    >
+                      <option value="score">スコア順</option>
+                      <option value="time">更新時間順</option>
+                      <option value="title">タイトル順</option>
+                    </select>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div 
-                  className="space-y-4 max-h-96 overflow-y-auto"
+                  className="space-y-4 max-h-screen overflow-y-auto"
                   onScroll={handleScroll}
                 >
                   {recentTopics.map((topic) => (
@@ -529,59 +668,29 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="articles" className="space-y-4">
-            <Card className="bg-slate-800 border-slate-700 text-white">
-              <CardHeader>
-                <CardTitle className="text-white">📝 生成記事一覧</CardTitle>
-                <p className="text-sm text-slate-400">
-                  最近生成された記事・編集・プレビュー可能
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentArticles.map((article) => (
-                    <div
-                      key={article.id}
-                      className="flex items-center justify-between p-6 bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-600 transition-all duration-200"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                          <Badge className={`${getStatusColor(article.status)} font-semibold`}>
-                            {article.status}
-                          </Badge>
-                          <Badge className="bg-purple-600 text-white font-medium">
-                            {getTypeLabel(article.type)}
-                          </Badge>
-                          <span className="text-sm text-slate-300 bg-slate-600 px-2 py-1 rounded">
-                            📄 {article.wordCount}文字
-                          </span>
-                        </div>
-                        <h3 className="font-semibold text-white text-lg mb-2">{article.title}</h3>
-                        <div className="flex items-center gap-3 mt-3">
-                          <div className="flex gap-2">
-                            {article.coins.map((coin) => (
-                              <Badge key={coin} className="bg-yellow-600 text-white font-medium">
-                                💰 {coin}
-                              </Badge>
-                            ))}
-                          </div>
-                          <span className="text-xs text-slate-400">
-                            🕒 {article.generatedAt}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                          👁️ プレビュー
-                        </Button>
-                        <Button className="bg-orange-600 hover:bg-orange-700 text-white">
-                          ✏️ 編集
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <ArticlePreview
+              articles={recentArticles}
+              onUpdateArticle={handleUpdateArticle}
+              onDeleteArticle={handleDeleteArticle}
+              onPublishArticle={handlePublishArticle}
+              onRefreshArticles={handleRefreshArticles}
+            />
+          </TabsContent>
+
+          <TabsContent value="generate" className="space-y-4">
+            <ArticleGenerationForm
+              topics={recentTopics}
+              onGenerate={handleGenerateArticleWithConfig}
+            />
+          </TabsContent>
+
+          <TabsContent value="manage" className="space-y-4">
+            <TopicManagement
+              topics={recentTopics}
+              onUpdateTopic={handleUpdateTopic}
+              onDeleteTopic={handleDeleteTopic}
+              onRefreshTopics={handleRefreshTopicsManagement}
+            />
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-4">

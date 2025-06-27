@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,7 +48,7 @@ interface Article {
   coins: string[]
 }
 
-export default function Dashboard() {
+function Dashboard() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard')
   const [systemStats, setSystemStats] = useState<SystemStats>({
     articlesGenerated: 0,
@@ -89,7 +90,9 @@ export default function Dashboard() {
         })
         console.log('Topics response:', topicsResponse) // デバッグ用
         console.log('Topics array length:', topicsResponse.topics?.length || 0)
+        console.log('First topic:', topicsResponse.topics?.[0])
         setRecentTopics(topicsResponse.topics || [])
+        console.log('State after setRecentTopics:', topicsResponse.topics || [])
         setHasMoreTopics(topicsResponse.pagination?.hasMore || false)
         setTopicsOffset(10)
         
@@ -622,6 +625,7 @@ export default function Dashboard() {
                   className="space-y-4 max-h-screen overflow-y-auto"
                   onScroll={handleScroll}
                 >
+                  {console.log('Rendering topics, length:', recentTopics.length, 'topics:', recentTopics)}
                   {recentTopics.map((topic) => (
                     <div
                       key={topic.id}
@@ -791,3 +795,6 @@ export default function Dashboard() {
     </div>
   )
 }
+
+// SSR を無効にしてクライアントサイドでのみレンダリング
+export default dynamic(() => Promise.resolve(Dashboard), { ssr: false })

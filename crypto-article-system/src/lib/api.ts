@@ -437,6 +437,80 @@ export class APIClient {
       key_descriptions: Record<string, string>
     }>('/api/secure-config/keys')
   }
+
+  // ソース管理
+  async getSources() {
+    return this.request<{
+      success: boolean
+      sources: Array<{
+        id: string
+        name: string
+        type: string
+        url: string
+        active: boolean
+        description?: string
+        itemsCollected?: number
+        lastUpdate?: string
+      }>
+    }>('/api/sources')
+  }
+
+  async addSource(source: {
+    name: string
+    type: string
+    url: string
+    description?: string
+    active?: boolean
+  }) {
+    return this.request<{
+      success: boolean
+      source: any
+      message: string
+    }>('/api/sources', {
+      method: 'POST',
+      body: JSON.stringify(source)
+    })
+  }
+
+  async updateSource(sourceId: string, updates: any) {
+    return this.request<{
+      success: boolean
+      message: string
+    }>(`/api/sources/${sourceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    })
+  }
+
+  async deleteSource(sourceId: string) {
+    return this.request<{
+      success: boolean
+      message: string
+    }>(`/api/sources/${sourceId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  async collectFromSource(sourceId: string) {
+    return this.request<{
+      success: boolean
+      message: string
+      collected_count: number
+    }>(`/api/sources/${sourceId}/collect`, {
+      method: 'POST'
+    })
+  }
+
+  async testSourceUrl(url: string, type: string) {
+    return this.request<{
+      success: boolean
+      message: string
+      items_found?: number
+    }>('/api/sources/test', {
+      method: 'POST',
+      body: JSON.stringify({ url, type })
+    })
+  }
 }
 
 // シングルトンのAPIクライアントインスタンス

@@ -12,6 +12,7 @@ import TopicManagement from '@/components/TopicManagement'
 import ArticlePreview from '@/components/ArticlePreview'
 import SystemMonitoring from '@/components/SystemMonitoring'
 import WordPressSettings from '@/components/WordPressSettings'
+import SourceManagement from '@/components/SourceManagement'
 
 // モックデータの型定義
 interface SystemStats {
@@ -82,8 +83,9 @@ export default function Dashboard() {
           limit: 10,
           sortBy: 'score' // デフォルトはスコア順
         })
-        setRecentTopics(topicsResponse.topics)
-        setHasMoreTopics(topicsResponse.pagination.hasMore)
+        console.log('Topics response:', topicsResponse) // デバッグ用
+        setRecentTopics(topicsResponse.topics || [])
+        setHasMoreTopics(topicsResponse.pagination?.hasMore || false)
         setTopicsOffset(10)
         
         // 記事を取得
@@ -490,7 +492,7 @@ export default function Dashboard() {
 
         {/* メインコンテンツ */}
         <Tabs defaultValue="topics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 bg-slate-800 border-slate-600">
+          <TabsList className="grid w-full grid-cols-8 bg-slate-800 border-slate-600">
             <TabsTrigger 
               value="topics" 
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -514,6 +516,12 @@ export default function Dashboard() {
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
               🔧 トピック管理
+            </TabsTrigger>
+            <TabsTrigger 
+              value="sources"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🔍 収集源管理
             </TabsTrigger>
             <TabsTrigger 
               value="monitoring"
@@ -705,6 +713,10 @@ export default function Dashboard() {
               onDeleteTopic={handleDeleteTopic}
               onRefreshTopics={handleRefreshTopicsManagement}
             />
+          </TabsContent>
+
+          <TabsContent value="sources" className="space-y-4">
+            <SourceManagement />
           </TabsContent>
 
           <TabsContent value="monitoring" className="space-y-4">

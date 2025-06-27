@@ -127,6 +127,13 @@ class APIConfigRequest(BaseModel):
     wordpress_password: Optional[str] = None
     coinmarketcap_api_key: Optional[str] = None
 
+class SourceRequest(BaseModel):
+    name: str
+    type: str  # 'rss', 'api', 'web'
+    url: str
+    description: Optional[str] = None
+    active: Optional[bool] = True
+
 # ヘルスチェック
 @app.get("/")
 async def root():
@@ -1170,6 +1177,285 @@ async def get_config_keys():
             "default_word_count_max": "最大単語数"
         }
     }
+
+# ソース管理エンドポイント
+@app.get("/api/sources")
+async def get_sources():
+    """登録されたソース一覧を取得"""
+    try:
+        # ソース情報をファイルから読み込み（実装簡略化）
+        sources_file = "sources.json"
+        if os.path.exists(sources_file):
+            with open(sources_file, 'r', encoding='utf-8') as f:
+                sources = json.load(f)
+        else:
+            # デフォルトソース
+            sources = [
+                {
+                    "id": "1",
+                    "name": "Cointelegraph RSS",
+                    "type": "rss",
+                    "url": "https://cointelegraph.com/rss",
+                    "active": True,
+                    "description": "暗号通貨ニュースの主要RSS配信",
+                    "itemsCollected": 15,
+                    "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                },
+                {
+                    "id": "2", 
+                    "name": "CoinGecko API",
+                    "type": "api",
+                    "url": "https://api.coingecko.com/api/v3/search/trending",
+                    "active": True,
+                    "description": "トレンドコインのAPI取得",
+                    "itemsCollected": 5,
+                    "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            ]
+        
+        return {"success": True, "sources": sources}
+        
+    except Exception as e:
+        logger.error(f"Error getting sources: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/sources")
+async def add_source(source: SourceRequest):
+    """新しいソースを追加"""
+    try:
+        sources_file = "sources.json"
+        
+        # 既存ソースを読み込み
+        if os.path.exists(sources_file):
+            with open(sources_file, 'r', encoding='utf-8') as f:
+                sources = json.load(f)
+        else:
+            sources = []
+        
+        # 新しいソースを追加
+        new_source = {
+            "id": str(len(sources) + 1),
+            "name": source.name,
+            "type": source.type,
+            "url": source.url,
+            "active": source.active,
+            "description": source.description,
+            "itemsCollected": 0,
+            "lastUpdate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        sources.append(new_source)
+        
+        # ファイルに保存
+        with open(sources_file, 'w', encoding='utf-8') as f:
+            json.dump(sources, f, indent=2, ensure_ascii=False)
+        
+        return {"success": True, "source": new_source, "message": "ソースを追加しました"}
+        
+    except Exception as e:
+        logger.error(f"Error adding source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/sources/{source_id}")
+async def update_source(source_id: str, updates: dict):
+    """ソースを更新"""
+    try:
+        sources_file = "sources.json"
+        
+        if not os.path.exists(sources_file):
+            raise HTTPException(status_code=404, detail="Sources file not found")
+        
+        with open(sources_file, 'r', encoding='utf-8') as f:
+            sources = json.load(f)
+        
+        # ソースを検索・更新
+        source_found = False
+        for source in sources:
+            if source["id"] == source_id:
+                source.update(updates)
+                source["lastUpdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                source_found = True
+                break
+        
+        if not source_found:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        # ファイルに保存
+        with open(sources_file, 'w', encoding='utf-8') as f:
+            json.dump(sources, f, indent=2, ensure_ascii=False)
+        
+        return {"success": True, "message": "ソースを更新しました"}
+        
+    except Exception as e:
+        logger.error(f"Error updating source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/sources/{source_id}")
+async def delete_source(source_id: str):
+    """ソースを削除"""
+    try:
+        sources_file = "sources.json"
+        
+        if not os.path.exists(sources_file):
+            raise HTTPException(status_code=404, detail="Sources file not found")
+        
+        with open(sources_file, 'r', encoding='utf-8') as f:
+            sources = json.load(f)
+        
+        # ソースを削除
+        original_length = len(sources)
+        sources = [s for s in sources if s["id"] != source_id]
+        
+        if len(sources) == original_length:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        # ファイルに保存
+        with open(sources_file, 'w', encoding='utf-8') as f:
+            json.dump(sources, f, indent=2, ensure_ascii=False)
+        
+        return {"success": True, "message": "ソースを削除しました"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/sources/{source_id}/collect")
+async def collect_from_source(source_id: str):
+    """特定のソースからトピックを収集"""
+    try:
+        sources_file = "sources.json"
+        
+        if not os.path.exists(sources_file):
+            raise HTTPException(status_code=404, detail="Sources file not found")
+        
+        with open(sources_file, 'r', encoding='utf-8') as f:
+            sources = json.load(f)
+        
+        # ソースを検索
+        source = None
+        for s in sources:
+            if s["id"] == source_id:
+                source = s
+                break
+        
+        if not source:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        if not source.get("active", True):
+            raise HTTPException(status_code=400, detail="Source is inactive")
+        
+        # トピック収集を実行（背景タスクとして）
+        if topic_manager:
+            if source["type"] == "rss":
+                collector = RSSFeedCollector()
+                collector.feeds = [source["url"]]  # URLを設定
+                new_topics = collector.collect()
+                topic_manager.add_topics(new_topics)
+                collected_count = len(new_topics)
+            elif source["type"] == "api":
+                # APIの場合は適切なコレクターを使用
+                if "coingecko" in source["url"].lower():
+                    collector = PriceDataCollector()
+                    new_topics = collector.collect()
+                    topic_manager.add_topics(new_topics)
+                    collected_count = len(new_topics)
+                else:
+                    collected_count = 0
+            else:
+                collected_count = 0
+            
+            # ソースの統計を更新
+            for s in sources:
+                if s["id"] == source_id:
+                    s["itemsCollected"] = s.get("itemsCollected", 0) + collected_count
+                    s["lastUpdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    break
+            
+            # ファイルに保存
+            with open(sources_file, 'w', encoding='utf-8') as f:
+                json.dump(sources, f, indent=2, ensure_ascii=False)
+        
+        return {
+            "success": True, 
+            "message": f"ソース '{source['name']}' から {collected_count} 件のトピックを収集しました",
+            "collected_count": collected_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error collecting from source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/sources/test")
+async def test_source_url(url_data: dict):
+    """ソースURLをテスト"""
+    try:
+        url = url_data.get("url")
+        source_type = url_data.get("type", "rss")
+        
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+        
+        # URLテストを実行
+        import aiohttp
+        import asyncio
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status != 200:
+                        return {
+                            "success": False,
+                            "message": f"HTTP {response.status}: アクセスできません"
+                        }
+                    
+                    content = await response.text()
+                    
+                    if source_type == "rss":
+                        if "<rss" in content or "<feed" in content or "<entry" in content:
+                            item_count = content.count("<item>") + content.count("<entry>")
+                            return {
+                                "success": True,
+                                "message": "RSS フィードが正常に取得できました",
+                                "items_found": item_count
+                            }
+                        else:
+                            return {
+                                "success": False,
+                                "message": "RSSフィードではありません"
+                            }
+                    elif source_type == "api":
+                        try:
+                            data = json.loads(content)
+                            return {
+                                "success": True,
+                                "message": "API が正常に応答しました",
+                                "items_found": len(data) if isinstance(data, list) else 1
+                            }
+                        except json.JSONDecodeError:
+                            return {
+                                "success": False,
+                                "message": "有効なJSONレスポンスではありません"
+                            }
+                    else:
+                        return {
+                            "success": True,
+                            "message": "ウェブサイトが正常にアクセスできました"
+                        }
+                        
+            except asyncio.TimeoutError:
+                return {
+                    "success": False,
+                    "message": "接続タイムアウト"
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"接続エラー: {str(e)}"
+                }
+        
+    except Exception as e:
+        logger.error(f"Error testing source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def mask_api_key(api_key: str) -> str:
     """APIキーをマスクして表示"""

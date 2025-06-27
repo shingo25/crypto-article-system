@@ -622,16 +622,25 @@ function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div 
-                  className="space-y-4 max-h-screen overflow-y-auto"
+                  className="space-y-4 min-h-96 max-h-screen overflow-y-auto border border-red-500"
                   onScroll={handleScroll}
                 >
                   {console.log('Rendering topics, length:', recentTopics.length, 'topics:', recentTopics)}
-                  {recentTopics.map((topic) => (
+                  {console.log('Current filters:', topicFilters)}
+                  {recentTopics.length === 0 && (
+                    <div className="text-center py-8 text-red-500 bg-yellow-200">
+                      デバッグ: トピック配列が空です
+                    </div>
+                  )}
+                  {recentTopics.map((topic, index) => (
                     <div
                       key={topic.id}
-                      className="flex items-center justify-between p-6 bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-600 transition-all duration-200"
+                      className="flex items-center justify-between p-6 bg-slate-700 border-2 border-blue-500 rounded-lg hover:bg-slate-600 transition-all duration-200"
                     >
                       <div className="flex-1">
+                        <div className="text-red-500 bg-yellow-200 p-2 mb-2">
+                          デバッグ #{index + 1}: {topic.id} - {topic.title}
+                        </div>
                         <div className="flex items-center gap-3 mb-3">
                           <Badge className={`${getPriorityColor(topic.priority)} font-semibold`}>
                             {topic.priority.toUpperCase()}

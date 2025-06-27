@@ -24,12 +24,8 @@ export class APIClient {
       ...options,
     }
 
-    console.log(`API Request: ${config.method || 'GET'} ${url}`) // デバッグ用ログ
-
     try {
       const response = await fetch(url, config)
-      
-      console.log(`API Response: ${response.status} ${response.statusText}`) // デバッグ用ログ
       
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`
@@ -41,12 +37,10 @@ export class APIClient {
         } catch {
           // JSON解析失敗時は元のメッセージを使用
         }
-        console.error('API Error:', errorMessage)
         throw new Error(errorMessage)
       }
       
       const data = await response.json()
-      console.log('API Success:', data) // デバッグ用ログ
       return data
     } catch (error) {
       console.error('API request failed:', error)

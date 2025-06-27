@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,7 +47,7 @@ interface Article {
   coins: string[]
 }
 
-function Dashboard() {
+export default function Dashboard() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard')
   const [systemStats, setSystemStats] = useState<SystemStats>({
     articlesGenerated: 0,
@@ -66,7 +65,7 @@ function Dashboard() {
   const [topicFilters, setTopicFilters] = useState({
     priority: '',
     source: '',
-    sortBy: 'score' // 'score', 'time', 'title'
+    sortBy: 'time' // 'score', 'time', 'title' - デフォルトを最新日時順に変更
   })
 
   const [recentArticles, setRecentArticles] = useState<Article[]>([])
@@ -74,39 +73,26 @@ function Dashboard() {
   // データ取得のuseEffect
   useEffect(() => {
     const fetchData = async () => {
-      console.log('Starting fetchData...')
       try {
-        console.log('Fetching system stats...')
         // システム統計を取得
         const stats = await apiClient.getSystemStats()
-        console.log('System stats received:', stats)
         setSystemStats(stats)
         
-        console.log('Fetching topics...')
         // トピックを取得
         const topicsResponse = await apiClient.getTopics({ 
           limit: 10,
-          sortBy: 'score' // デフォルトはスコア順
+          sortBy: 'time' // デフォルトは最新日時順
         })
-        console.log('Topics response:', topicsResponse) // デバッグ用
-        console.log('Topics array length:', topicsResponse.topics?.length || 0)
-        console.log('First topic:', topicsResponse.topics?.[0])
         setRecentTopics(topicsResponse.topics || [])
-        console.log('State after setRecentTopics:', topicsResponse.topics || [])
         setHasMoreTopics(topicsResponse.pagination?.hasMore || false)
         setTopicsOffset(10)
         
-        console.log('Fetching articles...')
         // 記事を取得
         const articlesResponse = await apiClient.getArticles({ limit: 10 })
-        console.log('Articles response:', articlesResponse)
         setRecentArticles(articlesResponse.articles || [])
         
-        console.log('All data fetched successfully')
       } catch (error) {
         console.error('Failed to fetch data:', error)
-        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
-        console.error('Full error object:', error)
         // エラー時はモックデータを表示
         setRecentTopics([
           {
@@ -563,7 +549,7 @@ function Dashboard() {
                   <div>
                     <CardTitle className="text-white">🎯 収集済みトピック</CardTitle>
                     <p className="text-sm text-slate-400 mt-1">
-                      優先度スコア順に表示・記事生成可能
+                      最新10件を日時順に表示・記事生成可能
                     </p>
                   </div>
                   <Button 
@@ -613,8 +599,8 @@ function Dashboard() {
                       onChange={(e) => handleFilterChange('sortBy', e.target.value)}
                       className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
                     >
-                      <option value="score">スコア順</option>
                       <option value="time">更新時間順</option>
+                      <option value="score">スコア順</option>
                       <option value="title">タイトル順</option>
                     </select>
                   </div>
@@ -622,25 +608,15 @@ function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div 
-                  className="space-y-4 min-h-96 max-h-screen overflow-y-auto border border-red-500"
+                  className="space-y-4 max-h-screen overflow-y-auto"
                   onScroll={handleScroll}
                 >
-                  {console.log('Rendering topics, length:', recentTopics.length, 'topics:', recentTopics)}
-                  {console.log('Current filters:', topicFilters)}
-                  {recentTopics.length === 0 && (
-                    <div className="text-center py-8 text-red-500 bg-yellow-200">
-                      デバッグ: トピック配列が空です
-                    </div>
-                  )}
-                  {recentTopics.map((topic, index) => (
+                  {recentTopics.map((topic) => (
                     <div
                       key={topic.id}
-                      className="flex items-center justify-between p-6 bg-slate-700 border-2 border-blue-500 rounded-lg hover:bg-slate-600 transition-all duration-200"
+                      className="flex items-center justify-between p-6 bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-600 transition-all duration-200"
                     >
                       <div className="flex-1">
-                        <div className="text-red-500 bg-yellow-200 p-2 mb-2">
-                          デバッグ #{index + 1}: {topic.id} - {topic.title}
-                        </div>
                         <div className="flex items-center gap-3 mb-3">
                           <Badge className={`${getPriorityColor(topic.priority)} font-semibold`}>
                             {topic.priority.toUpperCase()}
@@ -804,6 +780,3 @@ function Dashboard() {
     </div>
   )
 }
-
-// SSR を無効にしてクライアントサイドでのみレンダリング
-export default dynamic(() => Promise.resolve(Dashboard), { ssr: false })

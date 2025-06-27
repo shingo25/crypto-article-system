@@ -73,32 +73,42 @@ export default function Dashboard() {
   // データ取得のuseEffect
   useEffect(() => {
     const fetchData = async () => {
+      console.log('Starting fetchData...')
       try {
+        console.log('Fetching system stats...')
         // システム統計を取得
         const stats = await apiClient.getSystemStats()
+        console.log('System stats received:', stats)
         setSystemStats(stats)
         
+        console.log('Fetching topics...')
         // トピックを取得
         const topicsResponse = await apiClient.getTopics({ 
           limit: 10,
           sortBy: 'score' // デフォルトはスコア順
         })
         console.log('Topics response:', topicsResponse) // デバッグ用
+        console.log('Topics array length:', topicsResponse.topics?.length || 0)
         setRecentTopics(topicsResponse.topics || [])
         setHasMoreTopics(topicsResponse.pagination?.hasMore || false)
         setTopicsOffset(10)
         
+        console.log('Fetching articles...')
         // 記事を取得
         const articlesResponse = await apiClient.getArticles({ limit: 10 })
-        setRecentArticles(articlesResponse.articles)
+        console.log('Articles response:', articlesResponse)
+        setRecentArticles(articlesResponse.articles || [])
         
+        console.log('All data fetched successfully')
       } catch (error) {
         console.error('Failed to fetch data:', error)
+        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+        console.error('Full error object:', error)
         // エラー時はモックデータを表示
         setRecentTopics([
           {
             id: '1',
-            title: 'APIから取得できませんでした - モックデータ',
+            title: `APIから取得できませんでした: ${error instanceof Error ? error.message : 'Unknown error'}`,
             priority: 'medium',
             score: 50,
             coins: ['BTC'],

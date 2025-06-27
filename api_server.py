@@ -22,6 +22,7 @@ from src.topic_collector import TopicManager, RSSFeedCollector, PriceDataCollect
 from src.crypto_article_generator_mvp import CryptoArticleGenerator, ArticleTopic, ArticleType, ArticleDepth
 from src.fact_checker import FactChecker
 from src.wordpress_publisher import WordPressClient, ArticlePublisher
+from src.config_manager import get_config_manager, ConfigValidator
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -1022,6 +1023,153 @@ async def test_api_connections():
     except Exception as e:
         logger.error(f"Error testing API connections: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# セキュア設定管理エンドポイント
+@app.get("/api/secure-config")
+async def get_secure_config():
+    """暗号化された設定を取得（センシティブな値は隠す）"""
+    try:
+        config_manager = get_config_manager()
+        config_summary = config_manager.get_config_summary()
+        
+        return {
+            "success": True,
+            "config": config_summary,
+            "total_keys": len(config_summary)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting secure config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/secure-config")
+async def update_secure_config(config_updates: Dict[str, Any]):
+    """暗号化された設定を更新"""
+    try:
+        config_manager = get_config_manager()
+        
+        # 設定値を検証
+        validation_errors = ConfigValidator.validate_config(config_updates)
+        if validation_errors:
+            return {
+                "success": False,
+                "message": "設定値の検証に失敗しました",
+                "errors": validation_errors
+            }
+        
+        # 設定を更新
+        success = config_manager.update_config(config_updates)
+        
+        if success:
+            # 環境変数も更新（後方互換性のため）
+            for key, value in config_updates.items():
+                if key == 'openai_api_key':
+                    os.environ['OPENAI_API_KEY'] = value
+                elif key == 'gemini_api_key':
+                    os.environ['GEMINI_API_KEY'] = value
+                elif key == 'wordpress_url':
+                    os.environ['WORDPRESS_URL'] = value
+                elif key == 'wordpress_username':
+                    os.environ['WORDPRESS_USERNAME'] = value
+                elif key == 'wordpress_password':
+                    os.environ['WORDPRESS_APP_PASSWORD'] = value
+                elif key == 'coinmarketcap_api_key':
+                    os.environ['COINMARKETCAP_API_KEY'] = value
+            
+            # WordPress クライアントを再初期化
+            global wordpress_client
+            if any(k.startswith('wordpress_') for k in config_updates.keys()):
+                try:
+                    wordpress_client = WordPressClient()
+                    logger.info("WordPress client reinitialized with secure config")
+                except Exception as e:
+                    logger.warning(f"Failed to reinitialize WordPress client: {e}")
+                    wordpress_client = None
+            
+            return {
+                "success": True,
+                "message": "設定を安全に保存しました",
+                "updated_keys": list(config_updates.keys())
+            }
+        else:
+            return {
+                "success": False,
+                "message": "設定の保存に失敗しました"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error updating secure config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/secure-config/backup")
+async def backup_secure_config():
+    """設定のバックアップを作成"""
+    try:
+        config_manager = get_config_manager()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = f"config_backup_{timestamp}.enc"
+        
+        success = config_manager.backup_config(backup_file)
+        
+        return {
+            "success": success,
+            "message": f"設定をバックアップしました: {backup_file}" if success else "バックアップに失敗しました",
+            "backup_file": backup_file if success else None
+        }
+        
+    except Exception as e:
+        logger.error(f"Error backing up config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/secure-config/validate")
+async def validate_secure_config(config_data: Dict[str, Any]):
+    """設定値の検証のみを行う"""
+    try:
+        validation_errors = ConfigValidator.validate_config(config_data)
+        
+        return {
+            "valid": len(validation_errors) == 0,
+            "errors": validation_errors,
+            "message": "設定値は有効です" if len(validation_errors) == 0 else "設定値に問題があります"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error validating config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/secure-config/keys")
+async def get_config_keys():
+    """設定可能なキーの一覧を取得"""
+    return {
+        "sensitive_keys": [
+            "openai_api_key",
+            "gemini_api_key", 
+            "wordpress_password",
+            "coinmarketcap_api_key",
+            "database_password",
+            "secret_key"
+        ],
+        "normal_keys": [
+            "wordpress_url",
+            "wordpress_username",
+            "max_articles_per_day",
+            "default_article_depth",
+            "default_word_count_min",
+            "default_word_count_max"
+        ],
+        "key_descriptions": {
+            "openai_api_key": "OpenAI APIキー (GPTモデル用)",
+            "gemini_api_key": "Google Gemini APIキー",
+            "wordpress_url": "WordPressサイトのURL",
+            "wordpress_username": "WordPressユーザー名",
+            "wordpress_password": "WordPressアプリケーションパスワード",
+            "coinmarketcap_api_key": "CoinMarketCap APIキー",
+            "max_articles_per_day": "1日の最大記事生成数",
+            "default_article_depth": "デフォルトの記事の深さ",
+            "default_word_count_min": "最小単語数",
+            "default_word_count_max": "最大単語数"
+        }
+    }
 
 def mask_api_key(api_key: str) -> str:
     """APIキーをマスクして表示"""

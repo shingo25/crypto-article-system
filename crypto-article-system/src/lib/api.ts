@@ -387,6 +387,56 @@ export class APIClient {
       method: 'POST'
     })
   }
+
+  // セキュア設定管理
+  async getSecureConfig() {
+    return this.request<{
+      success: boolean
+      config: Record<string, any>
+      total_keys: number
+    }>('/api/secure-config')
+  }
+
+  async updateSecureConfig(config: Record<string, any>) {
+    return this.request<{
+      success: boolean
+      message: string
+      updated_keys?: string[]
+      errors?: Record<string, string>
+    }>('/api/secure-config', {
+      method: 'POST',
+      body: JSON.stringify(config)
+    })
+  }
+
+  async validateSecureConfig(config: Record<string, any>) {
+    return this.request<{
+      valid: boolean
+      errors: Record<string, string>
+      message: string
+    }>('/api/secure-config/validate', {
+      method: 'POST',
+      body: JSON.stringify(config)
+    })
+  }
+
+  async backupSecureConfig() {
+    return this.request<{
+      success: boolean
+      message: string
+      backup_file?: string
+    }>('/api/secure-config/backup', {
+      method: 'POST'
+    })
+  }
+
+  async getConfigKeys() {
+    return this.request<{
+      sensitive_keys: string[]
+      normal_keys: string[]
+      key_descriptions: Record<string, string>
+    }>('/api/secure-config/keys')
+  }
 }
 
 // シングルトンのAPIクライアントインスタンス

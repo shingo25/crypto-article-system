@@ -10,6 +10,8 @@ import SettingsPage from '@/components/SettingsPage'
 import ArticleGenerationForm, { ArticleConfig } from '@/components/ArticleGenerationForm'
 import TopicManagement from '@/components/TopicManagement'
 import ArticlePreview from '@/components/ArticlePreview'
+import SystemMonitoring from '@/components/SystemMonitoring'
+import WordPressSettings from '@/components/WordPressSettings'
 
 // モックデータの型定義
 interface SystemStats {
@@ -488,7 +490,7 @@ export default function Dashboard() {
 
         {/* メインコンテンツ */}
         <Tabs defaultValue="topics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-slate-800 border-slate-600">
+          <TabsList className="grid w-full grid-cols-7 bg-slate-800 border-slate-600">
             <TabsTrigger 
               value="topics" 
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -514,10 +516,22 @@ export default function Dashboard() {
               🔧 トピック管理
             </TabsTrigger>
             <TabsTrigger 
+              value="monitoring"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📊 システム監視
+            </TabsTrigger>
+            <TabsTrigger 
+              value="wordpress"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🔗 WordPress
+            </TabsTrigger>
+            <TabsTrigger 
               value="logs"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
-              📊 ログ
+              📋 ログ
             </TabsTrigger>
           </TabsList>
 
@@ -691,6 +705,14 @@ export default function Dashboard() {
               onDeleteTopic={handleDeleteTopic}
               onRefreshTopics={handleRefreshTopicsManagement}
             />
+          </TabsContent>
+
+          <TabsContent value="monitoring" className="space-y-4">
+            <SystemMonitoring />
+          </TabsContent>
+
+          <TabsContent value="wordpress" className="space-y-4">
+            <WordPressSettings />
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-4">

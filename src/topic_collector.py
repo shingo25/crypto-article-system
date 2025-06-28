@@ -399,6 +399,9 @@ class TopicManager:
         self.topics: List[CollectedTopic] = []
         self.processed_titles: set = set()  # 重複防止
         self.topic_history: Dict[str, datetime.datetime] = {}  # 同じトピックの履歴
+        
+        # 初期化時にモックデータを生成
+        self._generate_mock_topics()
     
     def add_topics(self, topics: List[CollectedTopic]):
         """トピックを追加（重複チェック付き）"""
@@ -458,7 +461,7 @@ class TopicManager:
         
         # 時間による減衰（古いニュースはスコアが下がる）
         hours_old = (datetime.datetime.now() - topic.collected_at).total_seconds() / 3600
-        time_decay = max(0, 1 - (hours_old / 24))  # 24時間で0になる
+        time_decay = max(0.3, 1 - (hours_old / 72))  # 72時間でも30%は残る
         score *= time_decay
         
         # キーワード数によるボーナス
@@ -473,7 +476,7 @@ class TopicManager:
         
         return score
     
-    def get_top_topics(self, count: int = 10, min_score: float = 30) -> List[CollectedTopic]:
+    def get_top_topics(self, count: int = 10, min_score: float = 10) -> List[CollectedTopic]:
         """スコアの高いトピックを取得"""
         # スコアでソート
         sorted_topics = sorted(
@@ -547,6 +550,149 @@ class TopicManager:
                 report.append(f"   関連: {', '.join(topic.coins)}")
         
         return '\n'.join(report)
+    
+    def _generate_mock_topics(self):
+        """開発用のモックトピックを生成"""
+        import random
+        
+        mock_topics = [
+            # ビットコイン関連
+            ("ビットコイン価格が再び60,000ドルを突破、機関投資家の買いが加速", ["BTC"], TopicPriority.URGENT),
+            ("ビットコインETF承認への期待が高まる、SEC委員長が前向きな発言", ["BTC"], TopicPriority.HIGH),
+            ("マイクロストラテジーがビットコインを追加購入、総保有量が15万BTCに", ["BTC"], TopicPriority.HIGH),
+            ("ビットコインのハッシュレートが過去最高を更新、ネットワークセキュリティが向上", ["BTC"], TopicPriority.MEDIUM),
+            ("ビットコインの取引手数料が急上昇、mempool混雑が原因", ["BTC"], TopicPriority.MEDIUM),
+            
+            # イーサリアム関連
+            ("イーサリアム2.0のシャーディング実装が2024年に延期、開発チームが発表", ["ETH"], TopicPriority.HIGH),
+            ("イーサリアムのガス手数料が大幅に低下、Layer2ソリューションの普及が影響", ["ETH"], TopicPriority.MEDIUM),
+            ("DeFiプロトコルUniswapでの取引量が過去最高を記録", ["ETH", "UNI"], TopicPriority.HIGH),
+            ("イーサリアム財団が新しい研究助成プログラムを発表", ["ETH"], TopicPriority.MEDIUM),
+            ("NFTマーケットOpenSeaがイーサリアムL2への完全移行を検討", ["ETH"], TopicPriority.MEDIUM),
+            
+            # アルトコイン関連
+            ("Solanaネットワークが24時間のダウンタイムから復旧、原因は調査中", ["SOL"], TopicPriority.URGENT),
+            ("CardanoのHydraアップデートが正式にローンチ、スケーラビリティが大幅向上", ["ADA"], TopicPriority.HIGH),
+            ("Polygon（MATIC）がzk-SNARKsベースの新しいソリューションを発表", ["MATIC"], TopicPriority.HIGH),
+            ("Chainlink（LINK）が新しいオラクルサービスを開始、リアルワールドアセット対応", ["LINK"], TopicPriority.MEDIUM),
+            ("Avalanche（AVAX）上でのDeFiプロトコル数が1000を突破", ["AVAX"], TopicPriority.MEDIUM),
+            
+            # DeFi関連
+            ("DeFiプロトコルAaveで新しい担保オプションが追加", ["AAVE"], TopicPriority.MEDIUM),
+            ("Compound（COMP）がガバナンス提案により新機能を実装", ["COMP"], TopicPriority.MEDIUM),
+            ("1inch（1INCH）が新しいDEXアグリゲーター機能をリリース", ["1INCH"], TopicPriority.MEDIUM),
+            ("MakerDAO（MKR）がリアルワールドアセット担保の拡大を検討", ["MKR"], TopicPriority.MEDIUM),
+            ("SushiSwap（SUSHI）がクロスチェーン機能を強化", ["SUSHI"], TopicPriority.LOW),
+            
+            # 規制・法律関連
+            ("米SEC、仮想通貨取引所規制に関する新しいガイドラインを発表", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("日本政府、Web3推進のための新しい税制優遇措置を検討", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("EU、MiCA規制の詳細ガイドラインを公開、来年から施行", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            ("中国、デジタル人民元のクロスボーダー決済テストを拡大", ["DCEP"], TopicPriority.MEDIUM),
+            ("韓国、仮想通貨取引の税制改正案を国会に提出", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            
+            # テクノロジー関連
+            ("量子コンピューターの脅威に対する仮想通貨の対策が議論される", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("ライトニングネットワークの容量が5000BTCを突破", ["BTC"], TopicPriority.MEDIUM),
+            ("zkプルーフ技術の新しい実装がイーサリアムで成功", ["ETH"], TopicPriority.MEDIUM),
+            ("Web3ウォレットの新しいセキュリティ標準が策定", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            ("分散型ストレージFilecoin（FIL）が新しいプロトコルアップデートを実行", ["FIL"], TopicPriority.LOW),
+            
+            # 企業・機関投資家関連
+            ("Tesla、第3四半期にビットコインを追加購入していたことが判明", ["BTC"], TopicPriority.HIGH),
+            ("PayPal、仮想通貨決済サービスを日本でも開始予定", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("Goldman Sachs、仮想通貨取引デスクを拡張", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            ("JPモルガン、JPMコインの利用範囲を拡大", ["JPM"], TopicPriority.MEDIUM),
+            ("Meta、メタバース向け仮想通貨決済システムを開発中", ["META"], TopicPriority.MEDIUM),
+            
+            # マーケット分析関連
+            ("仮想通貨市場の時価総額が3兆ドルを再び突破", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("ビットコインとイーサリアムの相関係数が過去最低を記録", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            ("アルトコインシーズンの兆候が現れる、ビットコイン優位性が低下", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            ("機関投資家のDeFi参入が加速、AUM総額が1000億ドル突破", ["DeFi"], TopicPriority.MEDIUM),
+            ("仮想通貨レンディング市場の成長率が年率300%を記録", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            
+            # セキュリティ・ハッキング関連
+            ("大手DeFiプロトコルで5000万ドル相当のハッキング被害", ["DeFi"], TopicPriority.URGENT),
+            ("新しいフィッシング攻撃手法が発見、ユーザーに注意喚起", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("マルチシグウォレットの新しいセキュリティ脆弱性が報告", ["BTC", "ETH"], TopicPriority.HIGH),
+            ("仮想通貨取引所のコールドストレージ管理基準が更新", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            ("ブロックチェーン監査企業が新しい脆弱性検出ツールを発表", ["BTC", "ETH"], TopicPriority.MEDIUM),
+            
+            # 新技術・イノベーション関連
+            ("AIと仮想通貨を組み合わせた新しい投資プラットフォームが登場", ["AI", "BTC"], TopicPriority.MEDIUM),
+            ("グリーンビットコインマイニングの新技術が実用化", ["BTC"], TopicPriority.MEDIUM),
+            ("ブロックチェーンベースの炭素クレジット取引市場がローンチ", ["CARBON"], TopicPriority.MEDIUM),
+            ("仮想通貨とIoTデバイスの統合ソリューションが発表", ["IOT", "BTC"], TopicPriority.LOW),
+            ("宇宙空間でのビットコインマイニング実験が開始", ["BTC"], TopicPriority.LOW),
+            
+            # 追加のトピック（50件以上にするため）
+            ("Ripple（XRP）がCBDC技術で中央銀行と新たなパートナーシップ", ["XRP"], TopicPriority.HIGH),
+            ("Polkadot（DOT）パラチェーンオークションで新プロジェクトが大量参加", ["DOT"], TopicPriority.MEDIUM),
+            ("Cosmos（ATOM）のIBC接続が100チェーンを突破", ["ATOM"], TopicPriority.MEDIUM),
+            ("Litecoin（LTC）のMWEB機能が正式にアクティベート", ["LTC"], TopicPriority.MEDIUM),
+            ("Dogecoin（DOGE）がTwitterの決済システムに統合される可能性", ["DOGE"], TopicPriority.HIGH),
+            ("Binance Coin（BNB）がBSCエコシステム拡張を発表", ["BNB"], TopicPriority.MEDIUM),
+            ("TRON（TRX）がUSDTの発行量で新記録を達成", ["TRX"], TopicPriority.MEDIUM),
+            ("Algorand（ALGO）が政府系機関との大型契約を締結", ["ALGO"], TopicPriority.HIGH),
+            ("VeChain（VET）がサプライチェーン管理で大手小売業と提携", ["VET"], TopicPriority.MEDIUM),
+            ("Theta（THETA）がビデオストリーミング業界で新技術を導入", ["THETA"], TopicPriority.MEDIUM),
+            ("Hedera（HBAR）がエンタープライズ向けサービスを拡充", ["HBAR"], TopicPriority.MEDIUM),
+            ("The Graph（GRT）がWeb3インデックス技術を改善", ["GRT"], TopicPriority.MEDIUM),
+            ("Internet Computer（ICP）がスマートコントラクト実行速度で新記録", ["ICP"], TopicPriority.MEDIUM),
+            ("Elrond（EGLD）がNFTマーケットプレイス機能を強化", ["EGLD"], TopicPriority.MEDIUM),
+            ("Near Protocol（NEAR）がJavaScript開発者向けツールを発表", ["NEAR"], TopicPriority.MEDIUM),
+            ("Fantom（FTM）がDeFiエコシステム拡張のため大型ファンドを設立", ["FTM"], TopicPriority.MEDIUM),
+            ("Arbitrum（ARB）がLayer2ソリューションの利用者数が急増", ["ARB"], TopicPriority.HIGH),
+            ("Optimism（OP）がガバナンストークンの新しい配布方式を導入", ["OP"], TopicPriority.MEDIUM),
+            ("Immutable X（IMX）がゲーミングNFT市場で大型パートナーシップ", ["IMX"], TopicPriority.MEDIUM),
+            ("ApeCoin（APE）がメタバース関連プロジェクトで新展開", ["APE"], TopicPriority.MEDIUM),
+            ("Sandbox（SAND）がバーチャルランド売買で過去最高額を記録", ["SAND"], TopicPriority.MEDIUM),
+            ("Decentraland（MANA）でバーチャルファッションショーが開催", ["MANA"], TopicPriority.LOW),
+            ("Enjin（ENJ）がNFTゲーミングプラットフォームを大幅アップデート", ["ENJ"], TopicPriority.MEDIUM),
+            ("Flow（FLOW）がNBAとのNFTコレクション第2弾を発表", ["FLOW"], TopicPriority.MEDIUM),
+            ("Chiliz（CHZ）がスポーツファントークン市場を拡大", ["CHZ"], TopicPriority.LOW),
+        ]
+        
+        # 現在時刻から過去24時間の間でランダムな時刻を生成
+        now = datetime.datetime.now()
+        
+        for i, (title, coins, priority) in enumerate(mock_topics):
+            # ランダムな時刻を生成（過去24時間以内）
+            hours_ago = random.uniform(0, 24)
+            collected_at = now - datetime.timedelta(hours=hours_ago)
+            
+            # ソースをランダムに選択
+            sources = [TopicSource.RSS_FEED, TopicSource.PRICE_API, TopicSource.SOCIAL_MEDIA, TopicSource.NEWS_API]
+            source = random.choice(sources)
+            
+            # ソースURLを生成
+            source_urls = {
+                TopicSource.RSS_FEED: "https://cointelegraph.com/rss",
+                TopicSource.PRICE_API: "https://api.coingecko.com/api/v3/coins",
+                TopicSource.SOCIAL_MEDIA: "https://twitter.com/crypto",
+                TopicSource.NEWS_API: "https://newsapi.org/crypto"
+            }
+            
+            topic = CollectedTopic(
+                title=title,
+                source=source,
+                source_url=source_urls[source],
+                priority=priority,
+                coins=coins,
+                keywords=[],
+                summary=f"{title[:50]}...",
+                collected_at=collected_at,
+                data={},
+                score=0  # スコアは後で計算される
+            )
+            
+            # スコアを計算
+            topic.score = self._calculate_score(topic)
+            
+            self.topics.append(topic)
+            self.processed_titles.add(topic.title.lower())
+            self.topic_history[topic.title.lower()] = topic.collected_at
 
 
 def main():

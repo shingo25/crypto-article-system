@@ -48,7 +48,6 @@ interface Article {
 }
 
 export default function Dashboard() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard')
   const [systemStats, setSystemStats] = useState<SystemStats>({
     articlesGenerated: 0,
     topicsCollected: 0,
@@ -80,12 +79,12 @@ export default function Dashboard() {
         
         // トピックを取得
         const topicsResponse = await apiClient.getTopics({ 
-          limit: 10,
+          limit: 50,
           sortBy: 'time' // デフォルトは最新日時順
         })
         setRecentTopics(topicsResponse.topics || [])
         setHasMoreTopics(topicsResponse.pagination?.hasMore || false)
-        setTopicsOffset(10)
+        setTopicsOffset(50)
         
         // 記事を取得
         const articlesResponse = await apiClient.getArticles({ limit: 10 })
@@ -168,7 +167,7 @@ export default function Dashboard() {
     setLoadingTopics(true)
     try {
       const topicsResponse = await apiClient.getTopics({ 
-        limit: 10,
+        limit: 50,
         offset: 0,
         priority: topicFilters.priority || undefined,
         source: topicFilters.source || undefined,
@@ -177,7 +176,7 @@ export default function Dashboard() {
       })
       setRecentTopics(topicsResponse.topics)
       setHasMoreTopics(topicsResponse.pagination.hasMore)
-      setTopicsOffset(10)
+      setTopicsOffset(50)
     } catch (error) {
       console.error('Failed to refresh topics:', error)
       // より詳細なエラー情報を表示
@@ -195,7 +194,7 @@ export default function Dashboard() {
     setLoadingMoreTopics(true)
     try {
       const topicsResponse = await apiClient.getTopics({ 
-        limit: 10,
+        limit: 50,
         offset: topicsOffset,
         priority: topicFilters.priority || undefined,
         source: topicFilters.source || undefined,
@@ -204,7 +203,7 @@ export default function Dashboard() {
       
       setRecentTopics(prev => [...prev, ...topicsResponse.topics])
       setHasMoreTopics(topicsResponse.pagination.hasMore)
-      setTopicsOffset(prev => prev + 10)
+      setTopicsOffset(prev => prev + 50)
     } catch (error) {
       console.error('Failed to load more topics:', error)
       const errorMessage = error instanceof Error ? error.message : '追加トピック読み込みに失敗しました'
@@ -226,7 +225,7 @@ export default function Dashboard() {
       setLoadingTopics(true)
       try {
         const topicsResponse = await apiClient.getTopics({ 
-          limit: 10,
+          limit: 50,
           offset: 0,
           priority: newFilters.priority || undefined,
           source: newFilters.source || undefined,
@@ -234,7 +233,7 @@ export default function Dashboard() {
         })
         setRecentTopics(topicsResponse.topics)
         setHasMoreTopics(topicsResponse.pagination.hasMore)
-        setTopicsOffset(10)
+        setTopicsOffset(50)
       } catch (error) {
         console.error('Failed to filter topics:', error)
         const errorMessage = error instanceof Error ? error.message : 'フィルタリングに失敗しました'
@@ -361,10 +360,6 @@ export default function Dashboard() {
     return types[type] || type
   }
 
-  // 設定画面を表示する場合
-  if (currentView === 'settings') {
-    return <SettingsPage onBack={() => setCurrentView('dashboard')} />
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
@@ -379,29 +374,17 @@ export default function Dashboard() {
               AI駆動の自動記事生成・監視ダッシュボード
             </p>
           </div>
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              size="default"
-              onClick={() => setCurrentView(currentView === 'dashboard' ? 'settings' : 'dashboard')}
-              className="bg-slate-800 border-slate-600 text-white hover:bg-slate-700"
-            >
-              {currentView === 'dashboard' ? '⚙️ 設定' : '🏠 ダッシュボード'}
-            </Button>
-            {currentView === 'dashboard' && (
-              <Button 
-                variant={systemStats.systemStatus === 'running' ? 'destructive' : 'default'}
-                size="default"
-                onClick={handleSystemControl}
-                className={systemStats.systemStatus === 'running' 
-                  ? 'bg-red-600 hover:bg-red-700' 
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-                }
-              >
-                {systemStats.systemStatus === 'running' ? '⏸️ 停止' : '▶️ 開始'}
-              </Button>
-            )}
-          </div>
+          <Button 
+            variant={systemStats.systemStatus === 'running' ? 'destructive' : 'default'}
+            size="default"
+            onClick={handleSystemControl}
+            className={systemStats.systemStatus === 'running' 
+              ? 'bg-red-600 hover:bg-red-700' 
+              : 'bg-green-600 hover:bg-green-700 text-white'
+            }
+          >
+            {systemStats.systemStatus === 'running' ? '⏸️ 停止' : '▶️ 開始'}
+          </Button>
         </div>
 
         {/* システム状況カード */}
@@ -491,7 +474,7 @@ export default function Dashboard() {
 
         {/* メインコンテンツ */}
         <Tabs defaultValue="topics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 bg-slate-800 border-slate-600">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-600">
             <TabsTrigger 
               value="topics" 
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -511,34 +494,10 @@ export default function Dashboard() {
               ✨ 記事生成
             </TabsTrigger>
             <TabsTrigger 
-              value="manage"
+              value="settings"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
-              🔧 トピック管理
-            </TabsTrigger>
-            <TabsTrigger 
-              value="sources"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              🔍 収集源管理
-            </TabsTrigger>
-            <TabsTrigger 
-              value="monitoring"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              📊 システム監視
-            </TabsTrigger>
-            <TabsTrigger 
-              value="wordpress"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              🔗 WordPress
-            </TabsTrigger>
-            <TabsTrigger 
-              value="logs"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              📋 ログ
+              ⚙️ 設定
             </TabsTrigger>
           </TabsList>
 
@@ -549,7 +508,7 @@ export default function Dashboard() {
                   <div>
                     <CardTitle className="text-white">🎯 収集済みトピック</CardTitle>
                     <p className="text-sm text-slate-400 mt-1">
-                      最新10件を日時順に表示・記事生成可能
+                      最新50件を日時順に表示・記事生成可能
                     </p>
                   </div>
                   <Button 
@@ -608,7 +567,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div 
-                  className="space-y-4 max-h-screen overflow-y-auto"
+                  className="space-y-4 max-h-[600px] overflow-y-auto"
                   onScroll={handleScroll}
                 >
                   {recentTopics.map((topic) => (
@@ -705,75 +664,104 @@ export default function Dashboard() {
             />
           </TabsContent>
 
-          <TabsContent value="manage" className="space-y-4">
-            <TopicManagement
-              topics={recentTopics}
-              onUpdateTopic={handleUpdateTopic}
-              onDeleteTopic={handleDeleteTopic}
-              onRefreshTopics={handleRefreshTopicsManagement}
-            />
-          </TabsContent>
+          <TabsContent value="settings" className="space-y-4">
+            <Tabs defaultValue="api" className="space-y-4">
+              <TabsList className="grid grid-cols-6 w-full bg-slate-700 border-slate-600">
+                <TabsTrigger value="api" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                  🔑 API設定
+                </TabsTrigger>
+                <TabsTrigger value="wordpress" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                  🔗 WordPress
+                </TabsTrigger>
+                <TabsTrigger value="sources" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                  🔍 収集源管理
+                </TabsTrigger>
+                <TabsTrigger value="topics" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                  🔧 トピック管理
+                </TabsTrigger>
+                <TabsTrigger value="monitoring" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                  📊 システム監視
+                </TabsTrigger>
+                <TabsTrigger value="logs" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                  📋 ログ
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="sources" className="space-y-4">
-            <SourceManagement />
-          </TabsContent>
+              <TabsContent value="api">
+                <SettingsPage />
+              </TabsContent>
 
-          <TabsContent value="monitoring" className="space-y-4">
-            <SystemMonitoring />
-          </TabsContent>
+              <TabsContent value="wordpress">
+                <WordPressSettings />
+              </TabsContent>
 
-          <TabsContent value="wordpress" className="space-y-4">
-            <WordPressSettings />
-          </TabsContent>
+              <TabsContent value="sources">
+                <SourceManagement />
+              </TabsContent>
 
-          <TabsContent value="logs" className="space-y-4">
-            <Card className="bg-slate-800 border-slate-700 text-white">
-              <CardHeader>
-                <CardTitle className="text-white">📊 システムログ</CardTitle>
-                <p className="text-sm text-slate-400">
-                  リアルタイムシステム監視・動作履歴
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-slate-900 text-green-400 p-6 rounded-lg font-mono text-sm h-96 overflow-y-auto border-2 border-slate-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:30:15]</span>
-                    <span className="text-green-500 font-bold">INFO:</span>
-                    <span>🚀 記事生成を開始しました</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:30:12]</span>
-                    <span className="text-green-500 font-bold">INFO:</span>
-                    <span>📋 トピック収集が完了しました (45件)</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:30:10]</span>
-                    <span className="text-green-500 font-bold">INFO:</span>
-                    <span>🔍 RSS フィードから新しいトピックを検出</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:30:05]</span>
-                    <span className="text-green-500 font-bold">INFO:</span>
-                    <span>💰 価格データを更新しました</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:30:00]</span>
-                    <span className="text-green-500 font-bold">INFO:</span>
-                    <span>✅ システム正常稼働中</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:29:55]</span>
-                    <span className="text-yellow-500 font-bold">WARN:</span>
-                    <span>⚠️ OpenAI API レート制限に接近</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-400">[2024-01-26 14:29:50]</span>
-                    <span className="text-green-500 font-bold">INFO:</span>
-                    <span>🔄 WordPress接続テスト成功</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <TabsContent value="topics">
+                <TopicManagement
+                  topics={recentTopics}
+                  onUpdateTopic={handleUpdateTopic}
+                  onDeleteTopic={handleDeleteTopic}
+                  onRefreshTopics={handleRefreshTopicsManagement}
+                />
+              </TabsContent>
+
+              <TabsContent value="monitoring">
+                <SystemMonitoring />
+              </TabsContent>
+
+              <TabsContent value="logs">
+                <Card className="bg-slate-800 border-slate-700 text-white">
+                  <CardHeader>
+                    <CardTitle className="text-white">📊 システムログ</CardTitle>
+                    <p className="text-sm text-slate-400">
+                      リアルタイムシステム監視・動作履歴
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-slate-900 text-green-400 p-6 rounded-lg font-mono text-sm h-96 overflow-y-auto border-2 border-slate-600">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:30:15]</span>
+                        <span className="text-green-500 font-bold">INFO:</span>
+                        <span>🚀 記事生成を開始しました</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:30:12]</span>
+                        <span className="text-green-500 font-bold">INFO:</span>
+                        <span>📋 トピック収集が完了しました (45件)</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:30:10]</span>
+                        <span className="text-green-500 font-bold">INFO:</span>
+                        <span>🔍 RSS フィードから新しいトピックを検出</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:30:05]</span>
+                        <span className="text-green-500 font-bold">INFO:</span>
+                        <span>💰 価格データを更新しました</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:30:00]</span>
+                        <span className="text-green-500 font-bold">INFO:</span>
+                        <span>✅ システム正常稼働中</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:29:55]</span>
+                        <span className="text-yellow-500 font-bold">WARN:</span>
+                        <span>⚠️ OpenAI API レート制限に接近</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-400">[2024-01-26 14:29:50]</span>
+                        <span className="text-green-500 font-bold">INFO:</span>
+                        <span>🔄 WordPress接続テスト成功</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </div>

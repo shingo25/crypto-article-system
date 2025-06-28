@@ -245,7 +245,7 @@ async def get_topics(
                     try:
                         logger.info(f"Collecting from {collector.__class__.__name__}...")
                         new_topics = collector.collect()
-                        topic_manager.add_topics(new_topics[:5])  # 最新5件のみ追加
+                        topic_manager.add_topics(new_topics[:25])  # 最新25件まで追加
                         logger.info(f"Successfully collected {len(new_topics)} topics from {collector.__class__.__name__}")
                     except Exception as e:
                         logger.warning(f"Error collecting from {collector.__class__.__name__}: {e}")
@@ -258,6 +258,7 @@ async def get_topics(
         
         # 全トピックを取得
         all_topics = topic_manager.get_top_topics(count=1000)  # 大きな数で全取得
+        logger.info(f"📈 Total topics available: {len(all_topics)}, All topics in manager: {len(topic_manager.topics)}")
         
         # フィルタリング
         filtered_topics = all_topics
@@ -318,7 +319,7 @@ async def get_topics(
                 "sourceUrl": topic.source_url
             })
         
-        return {
+        response_data = {
             "topics": topics_data,
             "pagination": {
                 "total": total_count,
@@ -327,6 +328,9 @@ async def get_topics(
                 "hasMore": offset + limit < total_count
             }
         }
+        
+        logger.info(f"📊 API Response: {len(topics_data)} topics out of {total_count} total (limit: {limit}, offset: {offset})")
+        return response_data
         
     except Exception as e:
         logger.error(f"Error getting topics: {e}")

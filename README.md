@@ -1,6 +1,11 @@
-# 暗号通貨記事自動生成システム
+# 🚀 暗号通貨記事自動生成システム
 
-大量の暗号通貨記事を自動生成し、WordPressに投稿できる包括的なフルスタックシステムです。
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)
+![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)
+
+AI駆動の暗号通貨記事自動生成システム。最新のトピックを収集し、高品質な記事を自動生成してWordPressに公開します。
 
 ## 🚀 主な機能
 
@@ -16,14 +21,19 @@
 
 #### フロントエンド（Next.js + TypeScript）
 - **ダッシュボード**: システム状況とリアルタイム統計表示
-- **設定画面**: API設定、WordPress連携、システムパラメータ管理
-- **API設定管理**: OpenAI、Gemini、WordPress APIの設定と接続テスト
-- **レスポンシブデザイン**: Tailwind CSS使用のモダンUI
+- **トピック管理**: 50件以上のトピック表示、フィルタリング、優先度設定
+- **記事生成フォーム**: 詳細なカスタマイズオプション付き記事生成
+- **記事プレビュー**: 生成記事の確認・編集・WordPress投稿
+- **統合設定画面**: API設定、WordPress連携、収集源管理、システム監視、ログ表示
+- **ソース管理**: RSS/API/Webサイトの追加・テスト・管理
+- **システム監視**: CPU/メモリ使用率、パフォーマンスメトリクス表示
+- **レスポンシブデザイン**: Tailwind CSS使用のモダンダークテーマUI
 
 ### 🔄 開発予定
-- **記事管理画面**: 生成された記事の一覧・編集・プレビュー
-- **トピック管理**: 手動トピック追加・優先度設定
 - **高度なスケジューリング**: 時間指定での自動実行
+- **分析ダッシュボード**: 記事パフォーマンスの詳細分析
+- **マルチユーザー対応**: チーム向け権限管理
+- **プラグイン機能**: カスタムデータソース・記事タイプの追加
 
 ## 📁 プロジェクト構成
 
@@ -31,10 +41,11 @@
 crypto-article-system/
 ├── src/                                    # Pythonソースコード
 │   ├── crypto_article_generator_mvp.py     # 記事生成エンジン
-│   ├── topic_collector.py                  # ネタ収集システム
+│   ├── topic_collector.py                  # ネタ収集システム（70件のモックデータ）
 │   ├── fact_checker.py                     # ファクトチェック機能
 │   ├── wordpress_publisher.py              # WordPress自動投稿
-│   └── article_pipeline.py                 # 統合パイプライン
+│   ├── article_pipeline.py                 # 統合パイプライン
+│   └── config_manager.py                   # セキュア設定管理（暗号化対応）
 ├── crypto-article-system/                  # Next.jsフロントエンド
 │   ├── src/
 │   │   ├── app/                            # Next.js App Router
@@ -96,13 +107,15 @@ npm run dev
 ### 3. 初回設定
 
 1. フロントエンドのダッシュボードにアクセス
-2. 「⚙️ 設定」ボタンから設定画面を開く
-3. 必要なAPIキーを設定：
+2. 「⚙️ 設定」タブをクリック
+3. 「🔑 API設定」で必要なAPIキーを設定：
    - OpenAI APIキー（必須）
    - Gemini APIキー（オプション）
-   - WordPress設定（オプション）
-4. 「🔍 接続テスト」で設定を確認
-5. 「💾 設定を保存」で保存
+   - CoinMarketCap APIキー（オプション）
+4. 「🔗 WordPress」タブでWordPress接続を設定
+5. 「🔍 収集源管理」タブでRSS/APIソースを追加
+6. 「🔍 接続テスト」で設定を確認
+7. 「💾 設定を保存」で保存
 
 ## 🎯 主な機能詳細
 
@@ -134,15 +147,19 @@ npm run dev
 
 ## 🖥️ フロントエンド機能
 
-### ダッシュボード
-- **リアルタイム統計**: 記事生成数、トピック収集数、システム状況
-- **システム制御**: 記事生成の開始・停止
-- **最新情報表示**: 最近のトピック、生成記事一覧
+### メインタブ構成（4タブ）
+1. **🎯 最新トピック**: 50件のトピック一覧、フィルタリング、記事生成
+2. **📝 生成記事**: 記事の確認・編集・WordPress投稿
+3. **✨ 記事生成**: 詳細設定での記事生成フォーム
+4. **⚙️ 設定**: 統合設定画面（6つのサブタブ）
 
-### 設定画面
-- **API管理**: 各種APIキーの設定と接続テスト
-- **WordPress連携**: サイト情報とアプリパスワード設定
-- **システムパラメータ**: 記事生成の詳細設定
+### 設定サブタブ
+- **🔑 API設定**: 各種APIキーの設定と接続テスト
+- **🔗 WordPress**: サイト情報とアプリパスワード設定
+- **🔍 収集源管理**: RSS/API/Webサイトの追加・管理
+- **🔧 トピック管理**: トピックの編集・削除・優先度設定
+- **📊 システム監視**: リアルタイムパフォーマンス監視
+- **📋 ログ**: システムログの確認
 
 ## 📋 API仕様
 
@@ -151,11 +168,23 @@ npm run dev
 | エンドポイント | メソッド | 説明 |
 |---------------|---------|------|
 | `/api/system/stats` | GET | システム統計情報取得 |
-| `/api/topics` | GET | トピック一覧取得 |
+| `/api/system/control` | POST | システムの開始・停止 |
+| `/api/topics` | GET | トピック一覧取得（フィルタ・ソート対応） |
+| `/api/topics/{id}` | PUT/DELETE | トピックの更新・削除 |
 | `/api/articles` | GET | 記事一覧取得 |
 | `/api/articles/generate` | POST | 記事生成開始 |
+| `/api/articles/{id}` | GET/PUT/DELETE | 記事の取得・更新・削除 |
+| `/api/articles/{id}/publish` | POST | WordPress投稿 |
 | `/api/settings/config` | GET/POST | API設定の取得・更新 |
 | `/api/settings/test-connection` | POST | API接続テスト |
+| `/api/sources` | GET/POST | ソース一覧取得・追加 |
+| `/api/sources/{id}` | PUT/DELETE | ソースの更新・削除 |
+| `/api/sources/{id}/collect` | POST | ソースからトピック収集 |
+| `/api/sources/test` | POST | ソースURLのテスト |
+| `/api/secure-config` | GET/POST | セキュア設定の取得・更新 |
+| `/api/wordpress/config` | GET/POST | WordPress設定の管理 |
+| `/api/wordpress/test` | POST | WordPress接続テスト |
+| `/api/logs` | GET | システムログ取得 |
 
 ## ⚙️ 設定項目
 
@@ -250,6 +279,33 @@ class NewDataCollector:
    - 仮想環境の有効化を確認
    - `pip install -r requirements.txt` の再実行
 
+## 🏗️ アーキテクチャ
+
+```mermaid
+graph TB
+    A[ユーザー] --> B[Next.jsフロントエンド]
+    B --> C[FastAPI バックエンド]
+    C --> D[トピック収集]
+    C --> E[記事生成AI]
+    C --> F[WordPress]
+    D --> G[RSS/API/Web]
+    E --> H[OpenAI/Gemini]
+```
+
+## 🔒 セキュリティ
+
+- **APIキー暗号化**: Fernet暗号化によるセキュア保存
+- **環境変数分離**: センシティブ情報の環境変数管理
+- **CORS設定**: 適切なCORSポリシー実装
+- **入力検証**: Pydanticによる厳格なデータ検証
+
+## 📈 パフォーマンス
+
+- **非同期処理**: FastAPIとasyncioによる高速処理
+- **キャッシュ機能**: 5分間のトピック収集キャッシュ
+- **バッチ処理**: 効率的な記事生成パイプライン
+- **最適化されたUI**: React Server Componentsによる高速レンダリング
+
 ## 📝 ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。
@@ -258,6 +314,23 @@ class NewDataCollector:
 
 バグ報告や機能要求は Issue でお知らせください。プルリクエストも歓迎します。
 
+1. Fork する
+2. Feature branch を作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. Branch にプッシュ (`git push origin feature/amazing-feature`)
+5. Pull Request を作成
+
 ## 📞 サポート
 
 技術的な質問や問題については、プロジェクトの Issue を使用してください。
+
+## 🙏 謝辞
+
+- OpenAI - GPT-4 API の提供
+- Google - Gemini Pro API の提供
+- Next.js チーム - 素晴らしいフレームワーク
+- すべてのオープンソースコントリビューター
+
+---
+
+<p align="center">Made with ❤️ by Your Team</p>

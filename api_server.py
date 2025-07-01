@@ -4,17 +4,21 @@ FastAPI backend server for the crypto article generation system
 フロントエンドとバックエンドを接続するREST APIサーバー
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import desc, or_
 import json
 import os
 import logging
 from datetime import datetime, timedelta
 import asyncio
 from contextlib import asynccontextmanager
+from celery.result import AsyncResult
+from redis import Redis
 
 # 自作モジュール
 from src.article_pipeline import ArticlePipeline, PipelineConfig
@@ -23,6 +27,12 @@ from src.crypto_article_generator_mvp import CryptoArticleGenerator, ArticleTopi
 from src.fact_checker import FactChecker
 from src.wordpress_publisher import WordPressClient, ArticlePublisher
 from src.config_manager import get_config_manager, ConfigValidator
+from src.database import (
+    get_db, Topic, Article, FactCheckResult, GenerationTask, SystemMetrics, ArticleTemplate,
+    DatabaseUtils, create_tables
+)
+from celery_app import app as celery_app, generate_article_async, collect_topics_async
+from scheduler import get_scheduler, start_scheduler, stop_scheduler, get_scheduler_status
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +44,7 @@ topic_manager: Optional[TopicManager] = None
 article_generator: Optional[CryptoArticleGenerator] = None
 fact_checker: Optional[FactChecker] = None
 wordpress_client: Optional[WordPressClient] = None
+redis_client: Optional[Redis] = None
 
 # キャッシュ管理
 import time
@@ -43,7 +54,7 @@ TOPIC_COLLECTION_INTERVAL = 300  # 5分間隔でトピック収集
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """アプリケーションの起動・終了時の処理"""
-    global pipeline, topic_manager, article_generator, fact_checker, wordpress_client
+    global pipeline, topic_manager, article_generator, fact_checker, wordpress_client, redis_client
     
     # 起動時の初期化
     logger.info("Initializing backend services...")
@@ -69,12 +80,45 @@ async def lifespan(app: FastAPI):
         logger.warning(f"WordPress client not available: {e}")
         wordpress_client = None
     
+    # Redis クライアント初期化
+    try:
+        redis_client = Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
+        redis_client.ping()  # 接続テスト
+        logger.info("Redis client initialized")
+    except Exception as e:
+        logger.warning(f"Redis client not available: {e}")
+        redis_client = None
+    
+    # データベーステーブルを作成
+    try:
+        create_tables()
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.warning(f"Database initialization failed: {e}")
+    
+    # スケジューラーを開始
+    try:
+        scheduler_started = await start_scheduler()
+        if scheduler_started:
+            logger.info("Topic collection scheduler started")
+        else:
+            logger.warning("Failed to start topic collection scheduler")
+    except Exception as e:
+        logger.warning(f"Scheduler initialization failed: {e}")
+    
     logger.info("Backend services initialized successfully")
     
     yield
     
     # 終了時のクリーンアップ
     logger.info("Shutting down backend services...")
+    
+    # スケジューラーを停止
+    try:
+        await stop_scheduler()
+        logger.info("Topic collection scheduler stopped")
+    except Exception as e:
+        logger.warning(f"Scheduler shutdown failed: {e}")
 
 # FastAPI アプリケーション
 app = FastAPI(
@@ -96,7 +140,7 @@ app.add_middleware(
 
 # Pydantic モデル
 class SystemControlRequest(BaseModel):
-    action: str  # 'start' or 'stop'
+    action: str  # 'start', 'stop', or 'restart'
 
 class ArticleGenerationRequest(BaseModel):
     topicId: str
@@ -144,6 +188,108 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+# テンプレート関連のエンドポイント
+@app.get("/api/templates")
+async def get_article_templates(
+    category: Optional[str] = None,
+    active_only: bool = True,
+    db: Session = Depends(get_db)
+):
+    """記事テンプレート一覧を取得"""
+    try:
+        query = db.query(ArticleTemplate)
+        
+        if active_only:
+            query = query.filter(ArticleTemplate.is_active == True)
+        
+        if category:
+            query = query.filter(ArticleTemplate.category == category)
+        
+        templates = query.order_by(ArticleTemplate.usage_count.desc()).all()
+        
+        return {
+            "templates": [
+                {
+                    "id": str(template.id),
+                    "name": template.name,
+                    "description": template.description,
+                    "category": template.category,
+                    "articleType": template.article_type,
+                    "tone": template.tone,
+                    "targetLength": template.target_length,
+                    "structure": template.structure,
+                    "requiredElements": template.required_elements,
+                    "keywordsTemplate": template.keywords_template,
+                    "systemPrompt": template.system_prompt,
+                    "userPromptTemplate": template.user_prompt_template,
+                    "seoTitleTemplate": template.seo_title_template,
+                    "metaDescriptionTemplate": template.meta_description_template,
+                    "usageCount": template.usage_count,
+                    "isActive": template.is_active,
+                    "isPublic": template.is_public,
+                    "createdAt": template.created_at.isoformat(),
+                    "updatedAt": template.updated_at.isoformat()
+                }
+                for template in templates
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error getting templates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/templates/{template_id}")
+async def get_template(template_id: int, db: Session = Depends(get_db)):
+    """特定のテンプレートを取得"""
+    try:
+        template = db.query(ArticleTemplate).filter(ArticleTemplate.id == template_id).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        return {
+            "id": str(template.id),
+            "name": template.name,
+            "description": template.description,
+            "category": template.category,
+            "articleType": template.article_type,
+            "tone": template.tone,
+            "targetLength": template.target_length,
+            "structure": template.structure,
+            "requiredElements": template.required_elements,
+            "keywordsTemplate": template.keywords_template,
+            "systemPrompt": template.system_prompt,
+            "userPromptTemplate": template.user_prompt_template,
+            "seoTitleTemplate": template.seo_title_template,
+            "metaDescriptionTemplate": template.meta_description_template,
+            "usageCount": template.usage_count,
+            "isActive": template.is_active,
+            "isPublic": template.is_public,
+            "createdAt": template.created_at.isoformat(),
+            "updatedAt": template.updated_at.isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting template {template_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/templates/{template_id}/use")
+async def use_template(template_id: int, db: Session = Depends(get_db)):
+    """テンプレートの使用回数をインクリメント"""
+    try:
+        template = db.query(ArticleTemplate).filter(ArticleTemplate.id == template_id).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        template.usage_count += 1
+        db.commit()
+        
+        return {"success": True, "usageCount": template.usage_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating template usage {template_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # システム関連のエンドポイント
 @app.get("/api/system/stats")
 async def get_system_stats():
@@ -165,14 +311,36 @@ async def get_system_stats():
         # トピック数を計算
         topics_count = len(topic_manager.topics) if topic_manager else 0
         
+        # データベースが利用可能な場合はテンプレート数も取得
+        templates_count = 4  # デフォルト値
+        try:
+            from src.database import SessionLocal, ArticleTemplate
+            db = SessionLocal()
+            templates_count = db.query(ArticleTemplate).filter(ArticleTemplate.is_active == True).count()
+            db.close()
+        except Exception:
+            pass  # データベースが利用できない場合はデフォルト値を使用
+        
+        # スケジューラーの状態を取得
+        scheduler_status = get_scheduler_status()
+        
         return {
             "articlesGenerated": articles_today,
             "topicsCollected": topics_count,
+            "templatesCount": templates_count,
             "systemStatus": "running" if pipeline else "stopped",
             "lastRun": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "dailyQuota": {
                 "used": stats.get('daily_count', articles_today),
                 "total": 50
+            },
+            "scheduler": {
+                "isRunning": scheduler_status.get('is_running', False),
+                "isCollecting": scheduler_status.get('is_collecting', False),
+                "lastCollectionTime": scheduler_status.get('last_collection_time'),
+                "collectionCount": scheduler_status.get('collection_count', 0),
+                "errorCount": scheduler_status.get('error_count', 0),
+                "nextRunTime": scheduler_status.get('next_run_time')
             }
         }
     except Exception as e:
@@ -181,29 +349,45 @@ async def get_system_stats():
 
 @app.post("/api/system/control")
 async def control_system(request: SystemControlRequest, background_tasks: BackgroundTasks):
-    """システムの開始・停止"""
+    """システムの開始・停止・再起動"""
     try:
         if request.action == "start":
+            # パイプライン開始
             if pipeline:
                 background_tasks.add_task(run_pipeline_once)
-                return {
-                    "success": True,
-                    "status": "starting",
-                    "message": "パイプラインを開始しました"
-                }
-            else:
-                raise HTTPException(status_code=500, detail="Pipeline not initialized")
+            
+            # スケジューラー開始
+            scheduler_started = await start_scheduler()
+            
+            return {
+                "success": True,
+                "status": "starting",
+                "message": f"システムを開始しました (スケジューラー: {'成功' if scheduler_started else '失敗'})"
+            }
         
         elif request.action == "stop":
-            # 停止処理（実際の実装では適切な停止処理を行う）
+            # スケジューラー停止
+            scheduler_stopped = await stop_scheduler()
+            
             return {
                 "success": True,
                 "status": "stopped",
-                "message": "パイプラインを停止しました"
+                "message": f"システムを停止しました (スケジューラー: {'成功' if scheduler_stopped else '失敗'})"
+            }
+        
+        elif request.action == "restart":
+            # スケジューラー再起動
+            from scheduler import restart_scheduler
+            scheduler_restarted = await restart_scheduler()
+            
+            return {
+                "success": True,
+                "status": "restarted",
+                "message": f"システムを再起動しました (スケジューラー: {'成功' if scheduler_restarted else '失敗'})"
             }
         
         else:
-            raise HTTPException(status_code=400, detail="Invalid action")
+            raise HTTPException(status_code=400, detail="Invalid action. Use 'start', 'stop', or 'restart'")
             
     except Exception as e:
         logger.error(f"Error controlling system: {e}")
@@ -402,118 +586,122 @@ async def delete_topic(topic_id: str):
 
 # 記事関連のエンドポイント
 @app.get("/api/articles")
-async def get_articles(limit: int = 20, status: Optional[str] = None, type: Optional[str] = None):
-    """記事一覧を取得"""
+async def get_articles(
+    limit: int = 20, 
+    status: Optional[str] = None, 
+    type: Optional[str] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """記事一覧をデータベースから取得"""
     try:
-        articles_dir = "./output/articles"
-        articles_data = []
+        query = db.query(Article)
         
-        if os.path.exists(articles_dir):
-            files = [f for f in os.listdir(articles_dir) if f.endswith('.html')]
-            files.sort(reverse=True)  # 新しい順
-            
-            for filename in files[:limit]:
-                # メタデータファイルを読み込み
-                meta_file = filename.replace('.html', '_meta.json')
-                meta_path = os.path.join(articles_dir, meta_file)
-                
-                if os.path.exists(meta_path):
-                    with open(meta_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                    
-                    article_data = {
-                        "id": filename.replace('.html', ''),
-                        "title": metadata.get('topic', {}).get('title', 'Unknown'),
-                        "type": metadata.get('article', {}).get('type', 'unknown'),
-                        "wordCount": metadata.get('article', {}).get('word_count', 0),
-                        "status": "draft",  # デフォルトは下書き
-                        "generatedAt": metadata.get('generated_at', ''),
-                        "coins": metadata.get('article', {}).get('coins', [])
-                    }
-                    
-                    # フィルタリング
-                    if status and article_data['status'] != status:
-                        continue
-                    if type and article_data['type'] != type:
-                        continue
-                    
-                    articles_data.append(article_data)
+        # フィルタリング
+        if status:
+            query = query.filter(Article.status == status)
+        if type:
+            query = query.filter(Article.type == type)
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Article.title.ilike(search_pattern),
+                    Article.content.ilike(search_pattern)
+                )
+            )
+        
+        # 新しい順で取得
+        articles = query.order_by(desc(Article.generated_at)).limit(limit).all()
+        
+        articles_data = []
+        for article in articles:
+            article_data = {
+                "id": str(article.id),
+                "title": article.title,
+                "type": article.type,
+                "wordCount": article.word_count or 0,
+                "status": article.status,
+                "generatedAt": article.generated_at.isoformat() if article.generated_at else '',
+                "coins": article.coins or [],
+                "source": article.source,
+                "sourceUrl": article.source_url
+            }
+            articles_data.append(article_data)
         
         return {"articles": articles_data}
         
     except Exception as e:
-        logger.error(f"Error getting articles: {e}")
+        logger.error(f"Error getting articles from database: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/articles/{article_id}/content")
-async def get_article_content(article_id: str):
-    """記事のコンテンツを取得"""
+async def get_article_content(article_id: str, db: Session = Depends(get_db)):
+    """記事のコンテンツをデータベースから取得"""
     try:
-        articles_dir = "./output/articles"
-        html_path = os.path.join(articles_dir, f"{article_id}.html")
+        article = DatabaseUtils.get_article_by_id(db, int(article_id))
         
-        if not os.path.exists(html_path):
+        if not article:
             raise HTTPException(status_code=404, detail="Article not found")
         
-        with open(html_path, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        
-        # HTMLからテキストを抽出（BeautifulSoupが利用可能な場合）
-        try:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html_content, 'html.parser')
-            text_content = soup.get_text()
-        except ImportError:
-            # BeautifulSoupが利用できない場合は簡易的にHTMLタグを除去
-            import re
-            text_content = re.sub('<[^<]+?>', '', html_content)
-        
         return {
-            "content": text_content,
-            "htmlContent": html_content
+            "content": article.content or '',
+            "htmlContent": article.html_content or '',
+            "title": article.title,
+            "type": article.type,
+            "status": article.status,
+            "wordCount": article.word_count or 0,
+            "coins": article.coins or [],
+            "source": article.source,
+            "sourceUrl": article.source_url
         }
         
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid article ID")
     except Exception as e:
-        logger.error(f"Error getting article content: {e}")
+        logger.error(f"Error getting article content from database: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/articles/{article_id}")
-async def update_article(article_id: str, updates: dict):
-    """記事を更新"""
+async def update_article(article_id: str, updates: dict, db: Session = Depends(get_db)):
+    """記事をデータベースで更新"""
     try:
-        articles_dir = "./output/articles"
-        meta_file = f"{article_id}_meta.json"
-        meta_path = os.path.join(articles_dir, meta_file)
+        article = DatabaseUtils.get_article_by_id(db, int(article_id))
         
-        if not os.path.exists(meta_path):
+        if not article:
             raise HTTPException(status_code=404, detail="Article not found")
         
-        # メタデータを読み込み
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-        
         # 更新可能なフィールドのみ適用
+        updated = False
         if 'title' in updates:
-            if 'article' not in metadata:
-                metadata['article'] = {}
-            metadata['article']['title'] = updates['title']
+            article.title = updates['title']
+            updated = True
+        if 'content' in updates:
+            article.content = updates['content']
+            # 文字数も更新
+            article.word_count = len(updates['content']) if updates['content'] else 0
+            updated = True
         if 'type' in updates:
-            if 'article' not in metadata:
-                metadata['article'] = {}
-            metadata['article']['type'] = updates['type']
+            article.type = updates['type']
+            updated = True
         if 'status' in updates:
-            if 'article' not in metadata:
-                metadata['article'] = {}
-            metadata['article']['status'] = updates['status']
+            article.status = updates['status']
+            updated = True
+        if 'coins' in updates:
+            article.coins = updates['coins']
+            updated = True
         
-        # メタデータを保存
-        with open(meta_path, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        if updated:
+            article.updated_at = datetime.utcnow()
+            db.commit()
         
         return {"success": True, "message": "Article updated successfully"}
         
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid article ID")
     except Exception as e:
-        logger.error(f"Error updating article: {e}")
+        logger.error(f"Error updating article in database: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/articles/{article_id}")
@@ -575,11 +763,11 @@ async def publish_article(article_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/articles/generate")
-async def generate_article(request: ArticleGenerationRequest, background_tasks: BackgroundTasks):
-    """記事を生成"""
+async def generate_article(request: ArticleGenerationRequest):
+    """記事を非同期で生成"""
     try:
-        if not article_generator or not topic_manager:
-            raise HTTPException(status_code=500, detail="Services not initialized")
+        if not topic_manager:
+            raise HTTPException(status_code=500, detail="Topic manager not initialized")
         
         # トピックを検索
         topic_found = None
@@ -591,112 +779,153 @@ async def generate_article(request: ArticleGenerationRequest, background_tasks: 
         if not topic_found:
             raise HTTPException(status_code=404, detail="Topic not found")
         
-        # 記事生成をバックグラウンドで実行
-        background_tasks.add_task(
-            generate_article_background,
-            topic_found,
-            request.type,
-            request.depth,
-            request.keywords,
-            request.wordCount,
-            request.tone,
-            request.includeImages,
-            request.includeCharts,
-            request.includeSources,
-            request.customInstructions
+        # Celeryタスクで非同期実行
+        task = generate_article_async.delay(
+            topic_id=request.topicId,
+            article_type=request.type or 'analysis',
+            depth=request.depth or 'comprehensive',
+            publish=False
         )
         
         return {
             "success": True,
-            "message": "記事生成を開始しました",
-            "articleId": f"generating_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            "message": "記事生成タスクを開始しました",
+            "taskId": task.id,
+            "status": "started"
         }
         
     except Exception as e:
         logger.error(f"Error generating article: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def generate_article_background(
-    topic, 
-    article_type=None, 
-    depth=None, 
-    keywords=None,
-    word_count=1000,
-    tone="professional",
-    include_images=True,
-    include_charts=True,
-    include_sources=True,
-    custom_instructions=None
-):
-    """記事生成のバックグラウンドタスク"""
+# タスクステータスの取得エンドポイント
+@app.get("/api/tasks/{task_id}/status")
+async def get_task_status(task_id: str):
+    """タスクのステータスを取得"""
     try:
-        # ArticleTopicに変換
-        from src.crypto_article_generator_mvp import ArticleType, ArticleDepth
+        # Celeryタスクの状態を取得
+        result = AsyncResult(task_id, app=celery_app)
         
-        # デフォルト値の設定
-        if article_type:
-            for at in ArticleType:
-                if at.value == article_type:
-                    article_type = at
-                    break
-        else:
-            article_type = ArticleType.MARKET_OVERVIEW
-        
-        if depth:
-            for ad in ArticleDepth:
-                if ad.value == depth:
-                    depth = ad
-                    break
-        else:
-            depth = ArticleDepth.MEDIUM
-        
-        coin_symbol = topic.coins[0] if topic.coins else "CRYPTO"
-        article_topic = ArticleTopic(
-            title=topic.title,
-            coin_symbol=coin_symbol,
-            coin_name=coin_symbol,
-            article_type=article_type,
-            depth=depth,
-            keywords=keywords or topic.keywords
-        )
-        
-        # 記事を生成
-        article = article_generator.generate_article(article_topic)
-        
-        # ファイルに保存
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{timestamp}_{coin_symbol}_{article_type.value}"
-        
-        output_dir = "./output/articles"
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # HTML保存
-        with open(f"{output_dir}/{filename}.html", 'w', encoding='utf-8') as f:
-            f.write(article.html_content)
-        
-        # メタデータ保存
-        metadata = {
-            "generated_at": article.generated_at.isoformat(),
-            "topic": {
-                "title": topic.title,
-                "score": topic.score
-            },
-            "article": {
-                "type": article_type.value,
-                "depth": depth.value,
-                "word_count": article.word_count,
-                "coins": article.coins,
-                "keywords": article.keywords
+        if result.state == 'PENDING':
+            response = {
+                'task_id': task_id,
+                'status': 'pending',
+                'message': 'タスクが開始を待っています'
             }
-        }
+        elif result.state == 'PROGRESS':
+            response = {
+                'task_id': task_id,
+                'status': 'in_progress',
+                'progress': result.info.get('progress', 0),
+                'message': result.info.get('status', '処理中...')
+            }
+        elif result.state == 'SUCCESS':
+            response = {
+                'task_id': task_id,
+                'status': 'completed',
+                'result': result.result
+            }
+        else:  # FAILURE
+            response = {
+                'task_id': task_id,
+                'status': 'failed',
+                'error': str(result.info)
+            }
         
-        with open(f"{output_dir}/{filename}_meta.json", 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        # Redisから詳細ステータスを取得（利用可能な場合）
+        if redis_client:
+            try:
+                redis_status = redis_client.get(f"task:{task_id}:status")
+                if redis_status:
+                    redis_data = json.loads(redis_status)
+                    response.update(redis_data)
+            except Exception as e:
+                logger.warning(f"Failed to get Redis status: {e}")
         
-        logger.info(f"Article generated successfully: {filename}")
+        return response
         
     except Exception as e:
-        logger.error(f"Error in background article generation: {e}")
+        logger.error(f"Error getting task status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# トピック収集の非同期エンドポイント
+@app.post("/api/topics/collect")
+async def collect_topics_async_endpoint():
+    """トピックを非同期で収集"""
+    try:
+        # Celeryタスクで非同期実行
+        task = collect_topics_async.delay()
+        
+        return {
+            "success": True,
+            "message": "トピック収集タスクを開始しました",
+            "taskId": task.id,
+            "status": "started"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting topic collection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ファクトチェックエンドポイント
+@app.post("/api/articles/{article_id}/fact-check")
+async def run_fact_check(article_id: str, db: Session = Depends(get_db)):
+    """記事のファクトチェックを実行しデータベースに保存"""
+    try:
+        if not fact_checker:
+            raise HTTPException(status_code=500, detail="Fact checker not initialized")
+        
+        # データベースから記事を取得
+        article = DatabaseUtils.get_article_by_id(db, int(article_id))
+        
+        if not article:
+            raise HTTPException(status_code=404, detail="Article not found")
+        
+        # ファクトチェックを実行
+        text_content = article.content or ''
+        fact_check_result = fact_checker.check_article(text_content)
+        
+        # 結果を整形
+        total_facts = len(fact_check_result.get('items', []))
+        verified_facts = sum(1 for item in fact_check_result.get('items', []) if item.get('verified') is True)
+        failed_facts = sum(1 for item in fact_check_result.get('items', []) if item.get('verified') is False)
+        reliability_score = int(fact_check_result.get('reliability_score', 0) * 100)
+        
+        # ファクトチェック結果をデータベースに保存
+        fact_check_record = FactCheckResult(
+            article_id=article.id,
+            reliability_score=reliability_score,
+            total_facts=total_facts,
+            verified_facts=verified_facts,
+            failed_facts=failed_facts,
+            skipped_facts=total_facts - verified_facts - failed_facts,
+            results=fact_check_result,
+            checker_version="1.0.0",
+            checked_at=datetime.utcnow()
+        )
+        
+        db.add(fact_check_record)
+        db.commit()
+        
+        results = {
+            "totalFacts": total_facts,
+            "verified": verified_facts,
+            "failed": failed_facts,
+            "reliabilityScore": reliability_score,
+            "items": fact_check_result.get('items', [])
+        }
+        
+        return {
+            "success": True,
+            "results": results
+        }
+        
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid article ID")
+    except Exception as e:
+        logger.error(f"Error running fact check: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/articles/{article_id}")
 async def get_article_content(article_id: str):

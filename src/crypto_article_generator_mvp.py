@@ -34,6 +34,59 @@ class ArticleDepth(Enum):
     DEEP = "deep"        # 詳細記事（1000-1500文字）
 
 
+class AIProvider(Enum):
+    """AIプロバイダーの定義"""
+    OPENAI = "openai"
+    CLAUDE = "claude"
+    GEMINI = "gemini"
+
+
+class AIModel(Enum):
+    """AIモデルの定義（2025年6月版）"""
+    # OpenAI Models
+    GPT_4_TURBO = "gpt-4-turbo"
+    GPT_4O = "gpt-4o"
+    GPT_4O_MINI = "gpt-4o-mini"
+    O1_PREVIEW = "o1-preview"
+    O1_MINI = "o1-mini"
+    
+    # Claude Models
+    CLAUDE_3_5_SONNET = "claude-3-5-sonnet-20241022"
+    CLAUDE_3_5_HAIKU = "claude-3-5-haiku-20241022" 
+    CLAUDE_3_OPUS = "claude-3-opus-20240229"
+    CLAUDE_3_SONNET = "claude-3-sonnet-20240229"
+    CLAUDE_3_HAIKU = "claude-3-haiku-20240307"
+    
+    # Gemini Models
+    GEMINI_2_0_FLASH = "gemini-2.0-flash-exp"
+    GEMINI_1_5_PRO = "gemini-1.5-pro"
+    GEMINI_1_5_FLASH = "gemini-1.5-flash"
+    GEMINI_1_5_FLASH_8B = "gemini-1.5-flash-8b"
+
+
+@dataclass
+class AIConfig:
+    """AI設定情報"""
+    provider: AIProvider
+    model: AIModel
+    temperature: float = 0.7
+    max_tokens: int = 2000
+    top_p: float = 0.9
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+    
+    def to_dict(self) -> Dict:
+        return {
+            'provider': self.provider.value,
+            'model': self.model.value,
+            'temperature': self.temperature,
+            'max_tokens': self.max_tokens,
+            'top_p': self.top_p,
+            'frequency_penalty': self.frequency_penalty,
+            'presence_penalty': self.presence_penalty
+        }
+
+
 @dataclass
 class ArticleTopic:
     """記事のトピック情報"""
@@ -44,6 +97,7 @@ class ArticleTopic:
     depth: ArticleDepth
     keywords: List[str]
     source_data: Optional[Dict] = None
+    ai_config: Optional[AIConfig] = None
 
 
 @dataclass
@@ -176,45 +230,63 @@ class ArticleTemplates:
 
 
 class LLMClient:
-    """LLM API クライアント（OpenAI/Gemini対応）"""
+    """LLM API クライアント（OpenAI/Claude/Gemini対応・2025年版）"""
     
-    def __init__(self, provider: str = "openai"):
-        self.provider = provider
-        self.api_key = os.getenv(f"{provider.upper()}_API_KEY")
+    def __init__(self, ai_config: Optional[AIConfig] = None):
+        self.ai_config = ai_config or AIConfig(
+            provider=AIProvider.OPENAI,
+            model=AIModel.GPT_4O,
+            temperature=0.7,
+            max_tokens=2000
+        )
         
-        if not self.api_key:
-            raise ValueError(f"{provider} API key not found in environment variables")
+        # APIキーを環境変数から取得
+        self.api_keys = {
+            AIProvider.OPENAI: os.getenv("OPENAI_API_KEY"),
+            AIProvider.CLAUDE: os.getenv("CLAUDE_API_KEY"),  # 正式には ANTHROPIC_API_KEY
+            AIProvider.GEMINI: os.getenv("GEMINI_API_KEY")
+        }
+        
+        current_key = self.api_keys.get(self.ai_config.provider)
+        if not current_key:
+            raise ValueError(f"{self.ai_config.provider.value} API key not found in environment variables")
     
     def generate_article(self, prompt: str) -> str:
-        """記事を生成"""
-        if self.provider == "openai":
+        """記事を生成（プロバイダー別）"""
+        if self.ai_config.provider == AIProvider.OPENAI:
             return self._generate_with_openai(prompt)
-        elif self.provider == "gemini":
+        elif self.ai_config.provider == AIProvider.CLAUDE:
+            return self._generate_with_claude(prompt)
+        elif self.ai_config.provider == AIProvider.GEMINI:
             return self._generate_with_gemini(prompt)
         else:
-            raise ValueError(f"Unsupported provider: {self.provider}")
+            raise ValueError(f"Unsupported provider: {self.ai_config.provider}")
     
     def _generate_with_openai(self, prompt: str) -> str:
-        """OpenAI APIを使用して生成"""
+        """OpenAI APIを使用して生成（2025年版モデル対応）"""
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {self.api_keys[AIProvider.OPENAI]}",
             "Content-Type": "application/json"
         }
         
         data = {
-            "model": "gpt-4-turbo-preview",
+            "model": self.ai_config.model.value,
             "messages": [
                 {"role": "system", "content": "あなたは暗号通貨の専門ライターです。正確で読みやすい記事を日本語で書いてください。"},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 2000
+            "temperature": self.ai_config.temperature,
+            "max_tokens": self.ai_config.max_tokens,
+            "top_p": self.ai_config.top_p,
+            "frequency_penalty": self.ai_config.frequency_penalty,
+            "presence_penalty": self.ai_config.presence_penalty
         }
         
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers=headers,
-            json=data
+            json=data,
+            timeout=60
         )
         
         if response.status_code == 200:
@@ -222,10 +294,88 @@ class LLMClient:
         else:
             raise Exception(f"OpenAI API error: {response.status_code} - {response.text}")
     
+    def _generate_with_claude(self, prompt: str) -> str:
+        """Claude APIを使用して生成（2025年版）"""
+        headers = {
+            "x-api-key": self.api_keys[AIProvider.CLAUDE],
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01"
+        }
+        
+        data = {
+            "model": self.ai_config.model.value,
+            "max_tokens": self.ai_config.max_tokens,
+            "temperature": self.ai_config.temperature,
+            "top_p": self.ai_config.top_p,
+            "messages": [
+                {
+                    "role": "user", 
+                    "content": f"あなたは暗号通貨の専門ライターです。正確で読みやすい記事を日本語で書いてください。\n\n{prompt}"
+                }
+            ]
+        }
+        
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=data,
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            return response.json()["content"][0]["text"]
+        else:
+            raise Exception(f"Claude API error: {response.status_code} - {response.text}")
+    
     def _generate_with_gemini(self, prompt: str) -> str:
-        """Gemini APIを使用して生成（実装予定）"""
-        # Gemini API実装
-        raise NotImplementedError("Gemini API integration coming soon")
+        """Gemini APIを使用して生成（2025年版）"""
+        api_key = self.api_keys[AIProvider.GEMINI]
+        
+        headers = {
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "contents": [{
+                "parts": [{
+                    "text": f"あなたは暗号通貨の専門ライターです。正確で読みやすい記事を日本語で書いてください。\n\n{prompt}"
+                }]
+            }],
+            "generationConfig": {
+                "temperature": self.ai_config.temperature,
+                "topP": self.ai_config.top_p,
+                "maxOutputTokens": self.ai_config.max_tokens,
+            }
+        }
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.ai_config.model.value}:generateContent?key={api_key}"
+        
+        response = requests.post(url, headers=headers, json=data, timeout=60)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            raise Exception(f"Gemini API error: {response.status_code} - {response.text}")
+    
+    @staticmethod
+    def get_available_models(provider: AIProvider) -> List[AIModel]:
+        """プロバイダー別の利用可能モデル一覧を取得"""
+        model_mapping = {
+            AIProvider.OPENAI: [
+                AIModel.GPT_4_TURBO, AIModel.GPT_4O, AIModel.GPT_4O_MINI,
+                AIModel.O1_PREVIEW, AIModel.O1_MINI
+            ],
+            AIProvider.CLAUDE: [
+                AIModel.CLAUDE_3_5_SONNET, AIModel.CLAUDE_3_5_HAIKU,
+                AIModel.CLAUDE_3_OPUS, AIModel.CLAUDE_3_SONNET, AIModel.CLAUDE_3_HAIKU
+            ],
+            AIProvider.GEMINI: [
+                AIModel.GEMINI_2_0_FLASH, AIModel.GEMINI_1_5_PRO,
+                AIModel.GEMINI_1_5_FLASH, AIModel.GEMINI_1_5_FLASH_8B
+            ]
+        }
+        return model_mapping.get(provider, [])
 
 
 class HTMLFormatter:
@@ -285,15 +435,30 @@ class HTMLFormatter:
 
 
 class CryptoArticleGenerator:
-    """記事生成システムのメインクラス"""
+    """記事生成システムのメインクラス（2025年版・多AI対応）"""
     
-    def __init__(self, llm_provider: str = "openai"):
-        self.llm_client = LLMClient(llm_provider)
+    def __init__(self, ai_config: Optional[AIConfig] = None):
+        self.ai_config = ai_config or AIConfig(
+            provider=AIProvider.OPENAI,
+            model=AIModel.GPT_4O,
+            temperature=0.7,
+            max_tokens=2000
+        )
+        self.llm_client = LLMClient(self.ai_config)
         self.templates = ArticleTemplates()
         self.formatter = HTMLFormatter()
     
     def generate_article(self, topic: ArticleTopic) -> GeneratedArticle:
-        """記事を生成"""
+        """記事を生成（AI設定に対応）"""
+        
+        # トピック固有のAI設定があれば使用、なければデフォルト設定
+        active_ai_config = topic.ai_config or self.ai_config
+        
+        # 設定が変更されている場合はLLMクライアントを更新
+        if topic.ai_config and topic.ai_config != self.ai_config:
+            llm_client = LLMClient(topic.ai_config)
+        else:
+            llm_client = self.llm_client
         
         # プロンプトテンプレートを取得
         prompt_template = self.templates.get_prompt_template(
@@ -310,8 +475,8 @@ class CryptoArticleGenerator:
         )
         
         # LLMで記事を生成
-        print(f"記事を生成中: {topic.title}")
-        content = self.llm_client.generate_article(prompt)
+        print(f"記事を生成中: {topic.title} (使用AI: {active_ai_config.provider.value}/{active_ai_config.model.value})")
+        content = llm_client.generate_article(prompt)
         
         # HTML形式に変換
         html_content = self.formatter.format_article(content, topic.article_type)
@@ -327,7 +492,9 @@ class CryptoArticleGenerator:
             word_count=word_count,
             generated_at=datetime.datetime.now(),
             metadata={
-                "llm_provider": self.llm_client.provider,
+                "ai_provider": active_ai_config.provider.value,
+                "ai_model": active_ai_config.model.value,
+                "ai_config": active_ai_config.to_dict(),
                 "prompt_length": len(prompt)
             }
         )

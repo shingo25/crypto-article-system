@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AlertCircle, Layout, Zap } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import toast from 'react-hot-toast'
 
 interface Topic {
   id: string
@@ -19,6 +21,28 @@ interface Topic {
   collectedAt: string
   source?: string
   sourceUrl?: string
+}
+
+interface ArticleTemplate {
+  id: string
+  name: string
+  description: string
+  category: string
+  articleType: string
+  tone: string
+  targetLength: number
+  structure: string[]
+  requiredElements: string[]
+  keywordsTemplate: string[]
+  systemPrompt: string
+  userPromptTemplate: string
+  seoTitleTemplate: string
+  metaDescriptionTemplate: string
+  usageCount: number
+  isActive: boolean
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 interface ArticleGenerationFormProps {
@@ -37,10 +61,15 @@ export interface ArticleConfig {
   includeCharts: boolean
   includeSources: boolean
   customInstructions?: string
+  templateId?: string
+  systemPrompt?: string
+  userPromptTemplate?: string
 }
 
 export default function ArticleGenerationForm({ topics, onGenerate }: ArticleGenerationFormProps) {
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
+  const [templates, setTemplates] = useState<ArticleTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<ArticleTemplate | null>(null)
   const [config, setConfig] = useState<ArticleConfig>({
     topicId: '',
     articleType: 'analysis',
@@ -56,11 +85,64 @@ export default function ArticleGenerationForm({ topics, onGenerate }: ArticleGen
   const [keywordInput, setKeywordInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [useTemplate, setUseTemplate] = useState(false)
+
+  // テンプレート取得
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await fetch('/api/templates')
+        const data = await response.json()
+        setTemplates(data.templates)
+      } catch (error) {
+        console.error('Failed to fetch templates:', error)
+      }
+    }
+    
+    fetchTemplates()
+  }, [])
 
   const handleTopicSelect = (topic: Topic) => {
     setSelectedTopic(topic)
     setConfig({ ...config, topicId: topic.id })
     setError(null)
+  }
+
+  const handleTemplateSelect = async (template: ArticleTemplate) => {
+    setSelectedTemplate(template)
+    setUseTemplate(true)
+    
+    // テンプレートの設定を適用
+    setConfig({
+      ...config,
+      articleType: template.articleType,
+      wordCount: template.targetLength,
+      keywords: [...template.keywordsTemplate],
+      tone: template.tone,
+      templateId: template.id,
+      systemPrompt: template.systemPrompt,
+      userPromptTemplate: template.userPromptTemplate
+    })
+    
+    // 使用回数をインクリメント
+    try {
+      await fetch(`/api/templates/${template.id}/use`, { method: 'POST' })
+      toast.success(`テンプレート「${template.name}」を適用しました`)
+    } catch (error) {
+      console.error('Failed to update template usage:', error)
+    }
+  }
+
+  const handleClearTemplate = () => {
+    setSelectedTemplate(null)
+    setUseTemplate(false)
+    setConfig({
+      ...config,
+      templateId: undefined,
+      systemPrompt: undefined,
+      userPromptTemplate: undefined
+    })
+    toast.success('テンプレートをクリアしました')
   }
 
   const handleAddKeyword = () => {
@@ -145,9 +227,86 @@ export default function ArticleGenerationForm({ topics, onGenerate }: ArticleGen
 
       {/* 記事設定 */}
       {selectedTopic && (
+        <>
+          {/* テンプレート選択 */}
+          <Card className="bg-slate-800 border-slate-700">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Layout className="h-5 w-5" />
+                  記事テンプレート
+                </CardTitle>
+                <CardDescription className="text-slate-400">
+                  テンプレートを使用して記事設定を効率化（オプション）
+                </CardDescription>
+              </div>
+              {selectedTemplate && (
+                <Button
+                  onClick={handleClearTemplate}
+                  variant="outline"
+                  size="sm"
+                  className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                >
+                  クリア
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {selectedTemplate ? (
+              <div className="p-4 rounded-lg bg-blue-900/20 border border-blue-600">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-white font-medium">{selectedTemplate.name}</h4>
+                  <Badge className="bg-blue-600 text-white">
+                    {selectedTemplate.category}
+                  </Badge>
+                </div>
+                <p className="text-sm text-gray-300 mb-3">{selectedTemplate.description}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                  <div>タイプ: {selectedTemplate.articleType}</div>
+                  <div>トーン: {selectedTemplate.tone}</div>
+                  <div>目標文字数: {selectedTemplate.targetLength}</div>
+                  <div>使用回数: {selectedTemplate.usageCount}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    onClick={() => handleTemplateSelect(template)}
+                    className="p-3 rounded-lg border border-slate-600 bg-slate-700 hover:bg-slate-600 cursor-pointer transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="text-white text-sm font-medium">{template.name}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {template.category}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-gray-400 line-clamp-2">{template.description}</p>
+                    <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                      <span>{template.targetLength}文字</span>
+                      <span>{template.usageCount}回使用</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 記事設定 */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-white">記事設定</CardTitle>
+            <CardTitle className="text-white">
+              記事設定
+              {selectedTemplate && (
+                <Badge className="ml-2 bg-blue-600 text-white text-xs">
+                  テンプレート適用中
+                </Badge>
+              )}
+            </CardTitle>
             <CardDescription className="text-slate-400">
               生成する記事の詳細設定を行ってください
             </CardDescription>
@@ -301,16 +460,42 @@ export default function ArticleGenerationForm({ topics, onGenerate }: ArticleGen
               </Alert>
             )}
 
+            {/* テンプレート情報表示 */}
+            {selectedTemplate && (
+              <div className="p-4 rounded-lg bg-blue-900/10 border border-blue-600/30">
+                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  テンプレート設定が適用されています
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="text-gray-300">
+                    <strong>構成:</strong> {selectedTemplate.structure.join(' → ')}
+                  </div>
+                  <div className="text-gray-300">
+                    <strong>必須要素:</strong> {selectedTemplate.requiredElements.join(', ')}
+                  </div>
+                  {selectedTemplate.systemPrompt && (
+                    <div className="text-gray-400 text-xs mt-2 p-2 bg-gray-800 rounded">
+                      <strong>システムプロンプト:</strong> {selectedTemplate.systemPrompt}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 生成ボタン */}
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !selectedTopic}
               className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
-              {isGenerating ? '記事を生成中...' : '記事を生成'}
+              {isGenerating ? '記事を生成中...' : (
+                selectedTemplate ? `「${selectedTemplate.name}」で記事を生成` : '記事を生成'
+              )}
             </Button>
           </CardContent>
         </Card>
+        </>
       )}
     </div>
   )

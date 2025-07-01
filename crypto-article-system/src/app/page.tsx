@@ -1,769 +1,446 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { apiClient } from '@/lib/api'
+import { Input } from '@/components/ui/input'
 import SettingsPage from '@/components/SettingsPage'
-import ArticleGenerationForm, { ArticleConfig } from '@/components/ArticleGenerationForm'
-import TopicManagement from '@/components/TopicManagement'
-import ArticlePreview from '@/components/ArticlePreview'
-import SystemMonitoring from '@/components/SystemMonitoring'
-import WordPressSettings from '@/components/WordPressSettings'
-import SourceManagement from '@/components/SourceManagement'
-
-// モックデータの型定義
-interface SystemStats {
-  articlesGenerated: number
-  topicsCollected: number
-  systemStatus: 'running' | 'stopped' | 'error'
-  lastRun: string
-  dailyQuota: {
-    used: number
-    total: number
-  }
-}
-
-interface Topic {
-  id: string
-  title: string
-  priority: 'urgent' | 'high' | 'medium' | 'low'
-  score: number
-  coins: string[]
-  collectedAt: string
-  source?: string
-  sourceUrl?: string
-}
-
-interface Article {
-  id: string
-  title: string
-  type: string
-  wordCount: number
-  status: 'draft' | 'published' | 'pending'
-  generatedAt: string
-  coins: string[]
-}
+import ArticleGenerationForm from '@/components/ArticleGenerationForm'
+import { useTopics } from '@/hooks/useTopics'
+import { useArticles } from '@/hooks/useArticles'
+import { useSystemStats } from '@/hooks/useSystemStats'
+import { TopicList } from '@/components/TopicList'
+import { ArticleList } from '@/components/ArticleList'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
+import { 
+  Search, 
+  TrendingUp, 
+  BarChart3, 
+  Settings, 
+  Play, 
+  Pause,
+  RefreshCw,
+  Download,
+  Sparkles,
+  Filter,
+  SortAsc,
+  FileText,
+  Activity,
+  Zap,
+  Moon,
+  Sun,
+  Globe,
+  Command,
+  Layers,
+  Shield,
+  Cpu,
+  Database,
+  Wifi,
+  Target,
+  Brain,
+  Layout
+} from 'lucide-react'
 
 export default function Dashboard() {
-  const [systemStats, setSystemStats] = useState<SystemStats>({
-    articlesGenerated: 0,
-    topicsCollected: 0,
-    systemStatus: 'stopped',
-    lastRun: '',
-    dailyQuota: { used: 0, total: 50 }
-  })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isDarkMode, setIsDarkMode] = useState(true)
+  
+  const { 
+    topics, 
+    isLoading: topicsLoading, 
+    loadMoreTopics, 
+    hasMore: hasMoreTopics,
+    filters,
+    setFilters
+  } = useTopics()
+  
+  const { 
+    articles, 
+    isLoading: articlesLoading,
+    generateArticle
+  } = useArticles()
+  
+  const { 
+    stats, 
+    isLoading: statsLoading,
+    startSystem,
+    stopSystem,
+    collectTopics,
+    isControlling,
+    isCollecting
+  } = useSystemStats()
 
-  const [recentTopics, setRecentTopics] = useState<Topic[]>([])
-  const [loadingTopics, setLoadingTopics] = useState(false)
-  const [hasMoreTopics, setHasMoreTopics] = useState(true)
-  const [topicsOffset, setTopicsOffset] = useState(0)
-  const [loadingMoreTopics, setLoadingMoreTopics] = useState(false)
-  const [topicFilters, setTopicFilters] = useState({
-    priority: '',
-    source: '',
-    sortBy: 'time' // 'score', 'time', 'title' - デフォルトを最新日時順に変更
-  })
+  const isRunning = stats.systemStatus === 'running'
 
-  const [recentArticles, setRecentArticles] = useState<Article[]>([])
+  const toggleTheme = () => setIsDarkMode(!isDarkMode)
 
-  // データ取得のuseEffect
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // システム統計を取得
-        const stats = await apiClient.getSystemStats()
-        setSystemStats(stats)
-        
-        // トピックを取得
-        const topicsResponse = await apiClient.getTopics({ 
-          limit: 50,
-          sortBy: 'time' // デフォルトは最新日時順
-        })
-        setRecentTopics(topicsResponse.topics || [])
-        setHasMoreTopics(topicsResponse.pagination?.hasMore || false)
-        setTopicsOffset(50)
-        
-        // 記事を取得
-        const articlesResponse = await apiClient.getArticles({ limit: 10 })
-        setRecentArticles(articlesResponse.articles || [])
-        
-      } catch (error) {
-        console.error('Failed to fetch data:', error)
-        // エラー時はモックデータを表示
-        setRecentTopics([
-          {
-            id: '1',
-            title: `APIから取得できませんでした: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            priority: 'medium',
-            score: 50,
-            coins: ['BTC'],
-            collectedAt: new Date().toISOString()
-          }
-        ])
-      }
-    }
-
-    fetchData()
-    
-    // 30秒ごとにデータを更新
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // システム制御
-  const handleSystemControl = async () => {
-    try {
-      const action = systemStats.systemStatus === 'running' ? 'stop' : 'start'
-      await apiClient.controlSystem(action)
+  const StatCard = ({ icon: Icon, title, value, subtitle, gradient, textColor = "text-white", iconBg }) => (
+    <div className={`relative overflow-hidden rounded-3xl p-6 group cursor-pointer transition-all duration-500 hover:scale-105 ${gradient}`}>
+      {/* Animated background elements */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -translate-y-8 translate-x-8 group-hover:scale-125 transition-transform duration-700"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-white/5 translate-y-4 -translate-x-4 group-hover:scale-110 transition-transform duration-500"></div>
+      </div>
       
-      // システム統計を再取得
-      const stats = await apiClient.getSystemStats()
-      setSystemStats(stats)
-    } catch (error) {
-      console.error('Failed to control system:', error)
-      alert('システム制御に失敗しました')
-    }
-  }
-
-  // 記事生成（簡易版）
-  const handleGenerateArticle = async (topicId: string) => {
-    try {
-      await apiClient.generateArticle(topicId)
-      alert('記事生成を開始しました')
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center group-hover:rotate-6 transition-transform duration-300`}>
+            <Icon className={`h-6 w-6 ${textColor}`} />
+          </div>
+          <div className="text-right">
+            <div className={`text-sm font-medium opacity-80 ${textColor}`}>{title}</div>
+            {statsLoading ? (
+              <div className="h-8 w-16 bg-white/20 rounded-lg animate-pulse mt-1"></div>
+            ) : (
+              <div className={`text-3xl font-bold ${textColor} tracking-tight`}>{value}</div>
+            )}
+          </div>
+        </div>
+        {subtitle && (
+          <div className={`text-sm ${textColor} opacity-70 font-medium`}>{subtitle}</div>
+        )}
+      </div>
       
-      // 記事一覧を再取得（少し待ってから）
-      setTimeout(async () => {
-        const articlesResponse = await apiClient.getArticles({ limit: 10 })
-        setRecentArticles(articlesResponse.articles)
-      }, 2000)
-    } catch (error) {
-      console.error('Failed to generate article:', error)
-      alert('記事生成に失敗しました')
-    }
-  }
+      {/* Shine effect */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-full group-hover:-translate-x-full transition-transform duration-1000"></div>
+      </div>
+    </div>
+  )
 
-  // 記事生成（詳細設定版）
-  const handleGenerateArticleWithConfig = async (config: ArticleConfig) => {
-    try {
-      await apiClient.generateArticleWithConfig(config)
-      alert('記事生成を開始しました')
-      
-      // 記事一覧を再取得（少し待ってから）
-      setTimeout(async () => {
-        const articlesResponse = await apiClient.getArticles({ limit: 10 })
-        setRecentArticles(articlesResponse.articles)
-      }, 2000)
-    } catch (error) {
-      console.error('Failed to generate article with config:', error)
-      throw error
-    }
-  }
-
-  // トピック手動更新
-  const handleRefreshTopics = async () => {
-    setLoadingTopics(true)
-    try {
-      const topicsResponse = await apiClient.getTopics({ 
-        limit: 50,
-        offset: 0,
-        priority: topicFilters.priority || undefined,
-        source: topicFilters.source || undefined,
-        sortBy: topicFilters.sortBy,
-        force_refresh: true  // 手動更新時は強制的に最新データを取得
-      })
-      setRecentTopics(topicsResponse.topics)
-      setHasMoreTopics(topicsResponse.pagination.hasMore)
-      setTopicsOffset(50)
-    } catch (error) {
-      console.error('Failed to refresh topics:', error)
-      // より詳細なエラー情報を表示
-      const errorMessage = error instanceof Error ? error.message : 'トピック更新に失敗しました'
-      alert(`エラー: ${errorMessage}`)
-    } finally {
-      setLoadingTopics(false)
-    }
-  }
-
-  // 無限スクロール - 追加トピック読み込み
-  const loadMoreTopics = async () => {
-    if (loadingMoreTopics || !hasMoreTopics) return
-    
-    setLoadingMoreTopics(true)
-    try {
-      const topicsResponse = await apiClient.getTopics({ 
-        limit: 50,
-        offset: topicsOffset,
-        priority: topicFilters.priority || undefined,
-        source: topicFilters.source || undefined,
-        sortBy: topicFilters.sortBy
-      })
-      
-      setRecentTopics(prev => [...prev, ...topicsResponse.topics])
-      setHasMoreTopics(topicsResponse.pagination.hasMore)
-      setTopicsOffset(prev => prev + 50)
-    } catch (error) {
-      console.error('Failed to load more topics:', error)
-      const errorMessage = error instanceof Error ? error.message : '追加トピック読み込みに失敗しました'
-      alert(`エラー: ${errorMessage}`)
-    } finally {
-      setLoadingMoreTopics(false)
-    }
-  }
-
-  // フィルタ変更ハンドラ（デバウンス機能付き）
-  const handleFilterChange = async (filterType: 'priority' | 'source' | 'sortBy', value: string) => {
-    const newFilters = { ...topicFilters, [filterType]: value }
-    setTopicFilters(newFilters)
-    
-    // 短時間で連続して呼ばれないようにデバウンス
-    setTimeout(async () => {
-      if (loadingTopics) return // 既に読み込み中の場合はスキップ
-      
-      setLoadingTopics(true)
-      try {
-        const topicsResponse = await apiClient.getTopics({ 
-          limit: 50,
-          offset: 0,
-          priority: newFilters.priority || undefined,
-          source: newFilters.source || undefined,
-          sortBy: newFilters.sortBy
-        })
-        setRecentTopics(topicsResponse.topics)
-        setHasMoreTopics(topicsResponse.pagination.hasMore)
-        setTopicsOffset(50)
-      } catch (error) {
-        console.error('Failed to filter topics:', error)
-        const errorMessage = error instanceof Error ? error.message : 'フィルタリングに失敗しました'
-        alert(`エラー: ${errorMessage}`)
-      } finally {
-        setLoadingTopics(false)
-      }
-    }, 300) // 300ms遅延
-  }
-
-  // スクロールイベントハンドラ
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    const isBottom = scrollTop + clientHeight >= scrollHeight - 100 // 100px手前で発火
-    
-    if (isBottom && hasMoreTopics && !loadingMoreTopics) {
-      loadMoreTopics()
-    }
-  }
-
-  // トピック管理のハンドラー
-  const handleUpdateTopic = async (topicId: string, updates: Partial<Topic>) => {
-    try {
-      await apiClient.updateTopic(topicId, updates)
-      // トピックリストを再取得
-      const topicsResponse = await apiClient.getTopics({ limit: 50 })
-      setRecentTopics(topicsResponse.topics)
-    } catch (error) {
-      console.error('Failed to update topic:', error)
-      throw error
-    }
-  }
-
-  const handleDeleteTopic = async (topicId: string) => {
-    try {
-      await apiClient.deleteTopic(topicId)
-      // トピックリストを再取得
-      const topicsResponse = await apiClient.getTopics({ limit: 50 })
-      setRecentTopics(topicsResponse.topics)
-    } catch (error) {
-      console.error('Failed to delete topic:', error)
-      throw error
-    }
-  }
-
-  const handleRefreshTopicsManagement = async () => {
-    await handleRefreshTopics()
-  }
-
-  // 記事管理のハンドラー
-  const handleUpdateArticle = async (articleId: string, updates: Partial<Article>) => {
-    try {
-      await apiClient.updateArticle(articleId, updates)
-      // 記事リストを再取得
-      const articlesResponse = await apiClient.getArticles({ limit: 50 })
-      setRecentArticles(articlesResponse.articles)
-    } catch (error) {
-      console.error('Failed to update article:', error)
-      throw error
-    }
-  }
-
-  const handleDeleteArticle = async (articleId: string) => {
-    try {
-      await apiClient.deleteArticle(articleId)
-      // 記事リストを再取得
-      const articlesResponse = await apiClient.getArticles({ limit: 50 })
-      setRecentArticles(articlesResponse.articles)
-    } catch (error) {
-      console.error('Failed to delete article:', error)
-      throw error
-    }
-  }
-
-  const handlePublishArticle = async (articleId: string) => {
-    try {
-      await apiClient.publishArticle(articleId)
-      // 記事リストを再取得
-      const articlesResponse = await apiClient.getArticles({ limit: 50 })
-      setRecentArticles(articlesResponse.articles)
-    } catch (error) {
-      console.error('Failed to publish article:', error)
-      throw error
-    }
-  }
-
-  const handleRefreshArticles = async () => {
-    try {
-      const articlesResponse = await apiClient.getArticles({ limit: 50 })
-      setRecentArticles(articlesResponse.articles)
-    } catch (error) {
-      console.error('Failed to refresh articles:', error)
-      throw error
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-500 text-white'
-      case 'high': return 'bg-orange-500 text-white'
-      case 'medium': return 'bg-yellow-500 text-white'
-      case 'low': return 'bg-green-500 text-white'
-      default: return 'bg-gray-500 text-white'
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'published': return 'bg-green-500 text-white'
-      case 'draft': return 'bg-blue-500 text-white'
-      case 'pending': return 'bg-yellow-500 text-white'
-      default: return 'bg-gray-500 text-white'
-    }
-  }
-
-  const getTypeLabel = (type: string) => {
-    const types: Record<string, string> = {
-      'price_analysis': '価格分析',
-      'educational': '解説記事',
-      'market_overview': '市場概況',
-      'breaking_news': '速報',
-      'technical_analysis': 'テクニカル分析'
-    }
-    return types[type] || type
-  }
-
+  const ActionButton = ({ onClick, disabled, variant, icon: Icon, children, className = "" }) => (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      className={`relative overflow-hidden flex items-center gap-2 font-semibold rounded-2xl px-6 py-3 transition-all duration-300 hover:scale-105 hover:shadow-2xl ${className}`}
+      variant={variant}
+    >
+      <Icon className="h-4 w-4 z-10" />
+      <span className="z-10">{children}</span>
+      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] hover:translate-x-[100%] transition-transform duration-700"></div>
+    </Button>
+  )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* ヘッダー */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              🚀 暗号通貨記事生成システム
-            </h1>
-            <p className="text-slate-300 mt-2 text-lg">
-              AI駆動の自動記事生成・監視ダッシュボード
-            </p>
+    <div className={`min-h-screen transition-all duration-700 ${
+      isDarkMode 
+        ? 'bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950' 
+        : 'bg-gradient-to-br from-indigo-50 via-white to-cyan-50'
+    }`}>
+      {/* Animated background pattern */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute top-20 left-20 w-72 h-72 rounded-full ${isDarkMode ? 'bg-blue-500/5' : 'bg-blue-500/10'} blur-3xl animate-pulse`}></div>
+        <div className={`absolute bottom-20 right-20 w-96 h-96 rounded-full ${isDarkMode ? 'bg-purple-500/5' : 'bg-purple-500/10'} blur-3xl animate-pulse delay-1000`}></div>
+        <div className={`absolute top-1/2 left-1/2 w-64 h-64 rounded-full ${isDarkMode ? 'bg-cyan-500/5' : 'bg-cyan-500/10'} blur-3xl animate-pulse delay-500`}></div>
+      </div>
+
+      {/* Modern Navbar */}
+      <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${
+        isDarkMode 
+          ? 'bg-gray-900/80 border-gray-800/50' 
+          : 'bg-white/80 border-gray-200/50'
+      } backdrop-blur-2xl border-b`}>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo & Brand */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Brain className="h-7 w-7 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-ping"></div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full"></div>
+              </div>
+              <div>
+                <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                  CryptoAI Pro
+                </h1>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} font-medium`}>
+                  Next-Gen Article Intelligence
+                </p>
+              </div>
+            </div>
+
+            {/* Center Search */}
+            <div className="hidden md:flex flex-1 max-w-md mx-8">
+              <div className="relative w-full">
+                <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                <Input
+                  placeholder="Search topics, articles, insights..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`pl-12 pr-4 py-3 w-full rounded-2xl border-0 font-medium ${
+                    isDarkMode 
+                      ? 'bg-gray-800/60 text-white placeholder:text-gray-400 focus:bg-gray-800' 
+                      : 'bg-gray-100/60 text-gray-900 placeholder:text-gray-500 focus:bg-white'
+                  } backdrop-blur-sm transition-all duration-300 focus:ring-2 focus:ring-blue-500/20`}
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <kbd className={`px-2 py-1 text-xs rounded-lg ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                    ⌘K
+                  </kbd>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
+              <ActionButton
+                onClick={toggleTheme}
+                variant="outline"
+                icon={isDarkMode ? Sun : Moon}
+                className={`border-2 ${
+                  isDarkMode 
+                    ? 'border-gray-700 text-gray-300 hover:bg-gray-800 hover:border-gray-600' 
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                {isDarkMode ? 'Light' : 'Dark'}
+              </ActionButton>
+
+              <ActionButton
+                onClick={collectTopics}
+                disabled={isCollecting}
+                variant="default"
+                icon={isCollecting ? RefreshCw : Download}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+              >
+                {isCollecting ? 'Collecting...' : 'Collect'}
+              </ActionButton>
+
+              <ActionButton
+                onClick={isRunning ? stopSystem : startSystem}
+                disabled={isControlling}
+                variant={isRunning ? "destructive" : "default"}
+                icon={isRunning ? Pause : Play}
+                className={isRunning 
+                  ? "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white border-0" 
+                  : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0"
+                }
+              >
+                {isControlling ? 'Processing...' : (isRunning ? 'Stop' : 'Start')}
+              </ActionButton>
+            </div>
           </div>
-          <Button 
-            variant={systemStats.systemStatus === 'running' ? 'destructive' : 'default'}
-            size="default"
-            onClick={handleSystemControl}
-            className={systemStats.systemStatus === 'running' 
-              ? 'bg-red-600 hover:bg-red-700' 
-              : 'bg-green-600 hover:bg-green-700 text-white'
-            }
-          >
-            {systemStats.systemStatus === 'running' ? '⏸️ 停止' : '▶️ 開始'}
-          </Button>
         </div>
+      </nav>
 
-        {/* システム状況カード */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className={`border-0 text-white card-hover ${
-            systemStats.systemStatus === 'running' 
-              ? 'bg-gradient-to-br from-green-500 to-green-700' 
-              : 'bg-gradient-to-br from-red-500 to-red-700'
-          }`}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/90">
-                システム状態
-              </CardTitle>
-              <span className="text-3xl">
-                {systemStats.systemStatus === 'running' ? '🟢' : '🔴'}
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {systemStats.systemStatus === 'running' ? '稼働中' : '停止中'}
-              </div>
-              <p className="text-xs text-white/70 mt-1">
-                最終実行: {systemStats.lastRun}
-              </p>
-            </CardContent>
-          </Card>
+      {/* Main Content */}
+      <div className="pt-24 pb-8">
+        <div className="max-w-7xl mx-auto px-6">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <StatCard
+              icon={Target}
+              title="Articles Generated"
+              value={stats.articlesGenerated}
+              subtitle="This month"
+              gradient="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500"
+              iconBg="bg-white/20"
+            />
+            <StatCard
+              icon={Database}
+              title="Topics Collected"
+              value={stats.topicsCollected}
+              subtitle="Analyzed topics"
+              gradient="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500"
+              iconBg="bg-white/20"
+            />
+            <StatCard
+              icon={Layout}
+              title="Templates"
+              value={stats.templatesCount || 4}
+              subtitle="Active templates"
+              gradient="bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500"
+              iconBg="bg-white/20"
+            />
+            <StatCard
+              icon={Cpu}
+              title="System Status"
+              value={stats.systemStatus === 'running' ? 'Active' : 'Idle'}
+              subtitle={`Last run: ${new Date(stats.lastRun || Date.now()).toLocaleTimeString()}`}
+              gradient="bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500"
+              iconBg="bg-white/20"
+            />
+            <StatCard
+              icon={Shield}
+              title="Daily Quota"
+              value={`${stats.dailyQuota.used}/${stats.dailyQuota.total}`}
+              subtitle={`${stats.dailyQuota.total - stats.dailyQuota.used} remaining`}
+              gradient="bg-gradient-to-br from-orange-500 via-red-500 to-pink-500"
+              iconBg="bg-white/20"
+            />
+          </div>
 
-          <Card className="bg-gradient-to-br from-blue-600 to-blue-800 border-0 text-white card-hover">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-100">
-                本日の記事生成数
-              </CardTitle>
-              <span className="text-3xl">📝</span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {systemStats.dailyQuota.used} / {systemStats.dailyQuota.total}
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-2 mt-2">
-                <div 
-                  className="bg-white h-2 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${(systemStats.dailyQuota.used / systemStats.dailyQuota.total) * 100}%` 
-                  }}
-                ></div>
-              </div>
-              <p className="text-xs text-blue-200 mt-1">
-                {Math.round((systemStats.dailyQuota.used / systemStats.dailyQuota.total) * 100)}% 使用
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-emerald-600 to-emerald-800 border-0 text-white card-hover">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-100">
-                収集トピック数
-              </CardTitle>
-              <span className="text-3xl">🎯</span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {systemStats.topicsCollected}
-              </div>
-              <p className="text-xs text-emerald-200 mt-1">
-                未処理トピック
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-600 to-purple-800 border-0 text-white card-hover">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-purple-100">
-                処理待ち時間
-              </CardTitle>
-              <span className="text-3xl">⏰</span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                5分
-              </div>
-              <p className="text-xs text-purple-200 mt-1">
-                次回実行まで
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* メインコンテンツ */}
-        <Tabs defaultValue="topics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-600">
-            <TabsTrigger 
-              value="topics" 
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              🎯 最新トピック
-            </TabsTrigger>
-            <TabsTrigger 
-              value="articles"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              📝 生成記事
-            </TabsTrigger>
-            <TabsTrigger 
-              value="generate"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              ✨ 記事生成
-            </TabsTrigger>
-            <TabsTrigger 
-              value="settings"
-              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-            >
-              ⚙️ 設定
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="topics" className="space-y-4">
-            <Card className="bg-slate-800 border-slate-700 text-white">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-white">🎯 収集済みトピック</CardTitle>
-                    <p className="text-sm text-slate-400 mt-1">
-                      最新50件を日時順に表示・記事生成可能
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={handleRefreshTopics}
-                    disabled={loadingTopics}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {loadingTopics ? '🔄 更新中...' : '🔄 更新'}
-                  </Button>
-                </div>
-                
-                {/* フィルタ */}
-                <div className="flex gap-4 mt-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm text-slate-300">優先度</label>
-                    <select
-                      value={topicFilters.priority}
-                      onChange={(e) => handleFilterChange('priority', e.target.value)}
-                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
-                    >
-                      <option value="">すべて</option>
-                      <option value="urgent">緊急</option>
-                      <option value="high">高</option>
-                      <option value="medium">中</option>
-                      <option value="low">低</option>
-                    </select>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm text-slate-300">ソース</label>
-                    <select
-                      value={topicFilters.source}
-                      onChange={(e) => handleFilterChange('source', e.target.value)}
-                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
-                    >
-                      <option value="">すべて</option>
-                      <option value="rss">RSS配信</option>
-                      <option value="price">価格データ</option>
-                      <option value="trend">トレンド</option>
-                    </select>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm text-slate-300">並び順</label>
-                    <select
-                      value={topicFilters.sortBy}
-                      onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white text-sm"
-                    >
-                      <option value="time">更新時間順</option>
-                      <option value="score">スコア順</option>
-                      <option value="title">タイトル順</option>
-                    </select>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div 
-                  className="space-y-4 max-h-[600px] overflow-y-auto"
-                  onScroll={handleScroll}
+          {/* Enhanced Tabs */}
+          <Tabs defaultValue="topics" className="space-y-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <TabsList className={`grid grid-cols-4 p-2 rounded-3xl w-full lg:w-auto ${
+                isDarkMode 
+                  ? 'bg-gray-800/50 border border-gray-700/50' 
+                  : 'bg-white/50 border border-gray-200/50'
+              } backdrop-blur-xl shadow-2xl`}>
+                <TabsTrigger 
+                  value="topics" 
+                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white'
+                  }`}
                 >
-                  {recentTopics.map((topic) => (
-                    <div
-                      key={topic.id}
-                      className="flex items-center justify-between p-6 bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-600 transition-all duration-200"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                          <Badge className={`${getPriorityColor(topic.priority)} font-semibold`}>
-                            {topic.priority.toUpperCase()}
-                          </Badge>
-                          <span className="text-sm text-slate-300 bg-slate-600 px-2 py-1 rounded">
-                            📊 スコア: {topic.score}
-                          </span>
-                          {topic.source && (
-                            <Badge className="bg-indigo-600 text-white font-medium">
-                              📡 {topic.source}
-                            </Badge>
-                          )}
-                        </div>
-                        <h3 className="font-semibold text-white text-lg mb-2">{topic.title}</h3>
-                        <div className="flex items-center gap-3 mt-3">
-                          <div className="flex gap-2">
-                            {topic.coins.map((coin) => (
-                              <Badge key={coin} className="bg-yellow-600 text-white font-medium">
-                                💰 {coin}
-                              </Badge>
-                            ))}
-                          </div>
-                          <span className="text-xs text-slate-400">
-                            🕒 {topic.collectedAt}
-                          </span>
-                          {topic.sourceUrl && (
-                            <a 
-                              href={topic.sourceUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
-                            >
-                              🔗 元記事を見る
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      <Button 
-                        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2"
-                        onClick={() => handleGenerateArticle(topic.id)}
-                      >
-                        ✨ 記事生成
-                      </Button>
-                    </div>
-                  ))}
-                  
-                  {/* 読み込み中インジケータ */}
-                  {loadingMoreTopics && (
-                    <div className="flex justify-center py-4">
-                      <div className="text-slate-400">🔄 読み込み中...</div>
-                    </div>
-                  )}
-                  
-                  {/* 全て読み込み完了メッセージ */}
-                  {!hasMoreTopics && recentTopics.length > 0 && (
-                    <div className="flex justify-center py-4">
-                      <div className="text-slate-400">✅ 全てのトピックを表示しました</div>
-                    </div>
-                  )}
-                  
-                  {/* トピックが0件の場合 */}
-                  {recentTopics.length === 0 && !loadingTopics && (
-                    <div className="flex justify-center py-8">
-                      <div className="text-slate-400">📋 条件に合うトピックが見つかりません</div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="articles" className="space-y-4">
-            <ArticlePreview
-              articles={recentArticles}
-              onUpdateArticle={handleUpdateArticle}
-              onDeleteArticle={handleDeleteArticle}
-              onPublishArticle={handlePublishArticle}
-              onRefreshArticles={handleRefreshArticles}
-            />
-          </TabsContent>
-
-          <TabsContent value="generate" className="space-y-4">
-            <ArticleGenerationForm
-              topics={recentTopics}
-              onGenerate={handleGenerateArticleWithConfig}
-            />
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-4">
-            <Tabs defaultValue="api" className="space-y-4">
-              <TabsList className="grid grid-cols-6 w-full bg-slate-700 border-slate-600">
-                <TabsTrigger value="api" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
-                  🔑 API設定
+                  <Globe className="h-4 w-4" />
+                  <span className="hidden sm:inline">Topics</span>
                 </TabsTrigger>
-                <TabsTrigger value="wordpress" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
-                  🔗 WordPress
+                <TabsTrigger 
+                  value="articles" 
+                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white'
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">Articles</span>
                 </TabsTrigger>
-                <TabsTrigger value="sources" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
-                  🔍 収集源管理
+                <TabsTrigger 
+                  value="generate" 
+                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white'
+                  }`}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span className="hidden sm:inline">Generate</span>
                 </TabsTrigger>
-                <TabsTrigger value="topics" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
-                  🔧 トピック管理
-                </TabsTrigger>
-                <TabsTrigger value="monitoring" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
-                  📊 システム監視
-                </TabsTrigger>
-                <TabsTrigger value="logs" className="text-slate-300 data-[state=active]:bg-slate-600 data-[state=active]:text-white">
-                  📋 ログ
+                <TabsTrigger 
+                  value="settings" 
+                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-400 data-[state=active]:to-gray-500 data-[state=active]:text-white'
+                  }`}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Settings</span>
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="api">
-                <SettingsPage />
-              </TabsContent>
+              {/* Quick Actions */}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className={`rounded-xl ${
+                  isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                </Button>
+                <Button variant="outline" size="sm" className={`rounded-xl ${
+                  isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}>
+                  <SortAsc className="h-4 w-4 mr-2" />
+                  Sort
+                </Button>
+              </div>
+            </div>
 
-              <TabsContent value="wordpress">
-                <WordPressSettings />
-              </TabsContent>
+            {/* Topic Monitoring */}
+            <TabsContent value="topics" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                    Real-time Topic Intelligence
+                  </h2>
+                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 text-lg font-medium`}>
+                    AI-curated high-impact topics with live monitoring
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20">
+                    <Wifi className="h-4 w-4 text-green-500" />
+                    <span className="text-green-500 font-semibold text-sm">Live</span>
+                  </div>
+                </div>
+              </div>
 
-              <TabsContent value="sources">
-                <SourceManagement />
-              </TabsContent>
-
-              <TabsContent value="topics">
-                <TopicManagement
-                  topics={recentTopics}
-                  onUpdateTopic={handleUpdateTopic}
-                  onDeleteTopic={handleDeleteTopic}
-                  onRefreshTopics={handleRefreshTopicsManagement}
+              <div className={`rounded-3xl p-8 ${
+                isDarkMode 
+                  ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
+                  : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
+              } backdrop-blur-xl shadow-2xl`}>
+                <TopicList
+                  topics={topics.filter(topic => 
+                    topic.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  )}
+                  isLoading={topicsLoading}
+                  hasMore={hasMoreTopics}
+                  onLoadMore={loadMoreTopics}
+                  getPriorityColor={(priority) => {
+                    switch (priority) {
+                      case 'urgent': return 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg'
+                      case 'high': return 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg'
+                      case 'medium': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg'
+                      case 'low': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
+                      default: return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg'
+                    }
+                  }}
                 />
-              </TabsContent>
+              </div>
+            </TabsContent>
 
-              <TabsContent value="monitoring">
-                <SystemMonitoring />
-              </TabsContent>
+            {/* Article Management */}
+            <TabsContent value="articles" className="space-y-6">
+              <div>
+                <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                  Content Management Hub
+                </h2>
+                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 text-lg font-medium`}>
+                  Manage, edit, and publish your AI-generated content
+                </p>
+              </div>
 
-              <TabsContent value="logs">
-                <Card className="bg-slate-800 border-slate-700 text-white">
-                  <CardHeader>
-                    <CardTitle className="text-white">📊 システムログ</CardTitle>
-                    <p className="text-sm text-slate-400">
-                      リアルタイムシステム監視・動作履歴
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-slate-900 text-green-400 p-6 rounded-lg font-mono text-sm h-96 overflow-y-auto border-2 border-slate-600">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:30:15]</span>
-                        <span className="text-green-500 font-bold">INFO:</span>
-                        <span>🚀 記事生成を開始しました</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:30:12]</span>
-                        <span className="text-green-500 font-bold">INFO:</span>
-                        <span>📋 トピック収集が完了しました (45件)</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:30:10]</span>
-                        <span className="text-green-500 font-bold">INFO:</span>
-                        <span>🔍 RSS フィードから新しいトピックを検出</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:30:05]</span>
-                        <span className="text-green-500 font-bold">INFO:</span>
-                        <span>💰 価格データを更新しました</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:30:00]</span>
-                        <span className="text-green-500 font-bold">INFO:</span>
-                        <span>✅ システム正常稼働中</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:29:55]</span>
-                        <span className="text-yellow-500 font-bold">WARN:</span>
-                        <span>⚠️ OpenAI API レート制限に接近</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400">[2024-01-26 14:29:50]</span>
-                        <span className="text-green-500 font-bold">INFO:</span>
-                        <span>🔄 WordPress接続テスト成功</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
-        </Tabs>
+              <div className={`rounded-3xl p-8 ${
+                isDarkMode 
+                  ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
+                  : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
+              } backdrop-blur-xl shadow-2xl`}>
+                <ArticleList
+                  articles={articles}
+                  isLoading={articlesLoading}
+                />
+              </div>
+            </TabsContent>
+
+            {/* AI Generation Studio */}
+            <TabsContent value="generate" className="space-y-6">
+              <div>
+                <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                  AI Generation Studio
+                </h2>
+                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 text-lg font-medium`}>
+                  Advanced AI configuration for optimal content creation
+                </p>
+              </div>
+
+              <div className={`rounded-3xl p-8 ${
+                isDarkMode 
+                  ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
+                  : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
+              } backdrop-blur-xl shadow-2xl`}>
+                <ArticleGenerationForm 
+                  topics={topics}
+                  onGenerate={generateArticle}
+                />
+              </div>
+            </TabsContent>
+
+            {/* Settings */}
+            <TabsContent value="settings" className="space-y-6">
+              <SettingsPage />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   )

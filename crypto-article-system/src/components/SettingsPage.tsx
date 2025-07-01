@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { apiClient } from '@/lib/api'
+import AIModelSettings from './AIModelSettings'
 
 interface APIConfig {
   openai_api_key: string
+  claude_api_key: string
   gemini_api_key: string
   wordpress_url: string
   wordpress_username: string
@@ -38,6 +40,7 @@ interface SettingsPageProps {
 export default function SettingsPage({ onBack }: SettingsPageProps) {
   const [config, setConfig] = useState<APIConfig>({
     openai_api_key: '',
+    claude_api_key: '',
     gemini_api_key: '',
     wordpress_url: '',
     wordpress_username: '',
@@ -187,13 +190,19 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
           </Alert>
         )}
 
-        <Tabs defaultValue="apis" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-slate-600">
+        <Tabs defaultValue="ai-models" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-600">
+            <TabsTrigger 
+              value="ai-models"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🧠 AI設定
+            </TabsTrigger>
             <TabsTrigger 
               value="apis"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
-              🤖 API設定
+              🔑 API設定
             </TabsTrigger>
             <TabsTrigger 
               value="wordpress"
@@ -208,6 +217,16 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
               ⚙️ システム設定
             </TabsTrigger>
           </TabsList>
+
+          {/* AI設定タブ */}
+          <TabsContent value="ai-models" className="space-y-4">
+            <AIModelSettings 
+              onSave={(aiConfig) => {
+                console.log('AI設定を保存:', aiConfig)
+                setMessage({ type: 'success', text: 'AI設定を保存しました' })
+              }}
+            />
+          </TabsContent>
 
           {/* API設定タブ */}
           <TabsContent value="apis" className="space-y-4">
@@ -251,6 +270,23 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
                     </div>
                     <p className="text-xs text-gray-500">
                       Google AI Studio で取得
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="claude_key">Claude APIキー</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="claude_key"
+                        type="password"
+                        placeholder="sk-ant-..."
+                        value={config.claude_api_key}
+                        onChange={(e) => handleInputChange('claude_api_key', e.target.value)}
+                      />
+                      {connectionStatus.claude && getStatusBadge(connectionStatus.claude.status)}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      https://console.anthropic.com/ で取得
                     </p>
                   </div>
                 </div>

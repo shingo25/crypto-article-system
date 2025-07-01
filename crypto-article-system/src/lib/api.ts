@@ -59,9 +59,18 @@ export class APIClient {
     return this.request<{
       articlesGenerated: number
       topicsCollected: number
+      templatesCount: number
       systemStatus: 'running' | 'stopped' | 'error'
       lastRun: string
       dailyQuota: { used: number; total: number }
+      scheduler: {
+        isRunning: boolean
+        isCollecting: boolean
+        lastCollectionTime: string | null
+        collectionCount: number
+        errorCount: number
+        nextRunTime: string | null
+      }
     }>('/api/system/stats')
   }
 
@@ -129,7 +138,7 @@ export class APIClient {
     }>(endpoint)
   }
 
-  // 記事生成の開始
+  // 記事生成の開始（非同期）
   async generateArticle(topicId: string, options?: {
     type?: string
     depth?: string
@@ -137,7 +146,8 @@ export class APIClient {
   }) {
     return this.request<{
       success: boolean
-      articleId?: string
+      taskId?: string
+      status?: string
       message: string
     }>('/api/articles/generate', {
       method: 'POST',
@@ -146,6 +156,35 @@ export class APIClient {
         ...options
       })
     })
+  }
+
+  // タスクステータスの取得
+  async getTaskStatus(taskId: string) {
+    return this.request<{
+      task_id: string
+      status: 'pending' | 'in_progress' | 'completed' | 'failed'
+      progress?: number
+      message?: string
+      result?: any
+      error?: string
+    }>(`/api/tasks/${taskId}/status`)
+  }
+
+  // トピック収集（非同期）
+  async collectTopicsAsync() {
+    return this.request<{
+      success: boolean
+      taskId: string
+      status: string
+      message: string
+    }>('/api/topics/collect', {
+      method: 'POST'
+    })
+  }
+
+  // トピック収集（シンプル版）
+  async collectTopics() {
+    return this.collectTopicsAsync()
   }
 
   // 記事生成（詳細設定版）
@@ -186,11 +225,11 @@ export class APIClient {
     })
   }
 
-  // 記事更新
-  async updateArticle(articleId: string, updates: any) {
+  // 記事全体更新（PUT）
+  async replaceArticle(articleId: string, articleData: any) {
     return this.request(`/api/articles/${articleId}`, {
       method: 'PUT',
-      body: JSON.stringify(updates)
+      body: JSON.stringify(articleData)
     })
   }
 
@@ -208,8 +247,8 @@ export class APIClient {
     })
   }
 
-  // システムの開始/停止
-  async controlSystem(action: 'start' | 'stop') {
+  // システムの開始/停止/再起動
+  async systemControl(action: 'start' | 'stop' | 'restart') {
     return this.request<{
       success: boolean
       status: string
@@ -303,7 +342,7 @@ export class APIClient {
     }>(`/api/articles/${articleId}`)
   }
 
-  // 記事の更新
+  // 記事部分更新（PATCH）
   async updateArticle(articleId: string, updates: {
     title?: string
     content?: string
@@ -512,6 +551,74 @@ export class APIClient {
     }>('/api/sources/test', {
       method: 'POST',
       body: JSON.stringify({ url, type })
+    })
+  }
+
+  // テンプレート関連のAPI
+  async getTemplates(params?: {
+    category?: string
+    active_only?: boolean
+  }) {
+    const searchParams = new URLSearchParams()
+    if (params?.category) searchParams.set('category', params.category)
+    if (params?.active_only) searchParams.set('active_only', params.active_only.toString())
+    
+    const endpoint = `/api/templates${searchParams.toString() ? `?${searchParams}` : ''}`
+    return this.request<{
+      templates: Array<{
+        id: string
+        name: string
+        description: string
+        category: string
+        articleType: string
+        tone: string
+        targetLength: number
+        structure: string[]
+        requiredElements: string[]
+        keywordsTemplate: string[]
+        systemPrompt: string
+        userPromptTemplate: string
+        seoTitleTemplate: string
+        metaDescriptionTemplate: string
+        usageCount: number
+        isActive: boolean
+        isPublic: boolean
+        createdAt: string
+        updatedAt: string
+      }>
+    }>(endpoint)
+  }
+
+  async getTemplate(templateId: string) {
+    return this.request<{
+      id: string
+      name: string
+      description: string
+      category: string
+      articleType: string
+      tone: string
+      targetLength: number
+      structure: string[]
+      requiredElements: string[]
+      keywordsTemplate: string[]
+      systemPrompt: string
+      userPromptTemplate: string
+      seoTitleTemplate: string
+      metaDescriptionTemplate: string
+      usageCount: number
+      isActive: boolean
+      isPublic: boolean
+      createdAt: string
+      updatedAt: string
+    }>(`/api/templates/${templateId}`)
+  }
+
+  async useTemplate(templateId: string) {
+    return this.request<{
+      success: boolean
+      usageCount: number
+    }>(`/api/templates/${templateId}/use`, {
+      method: 'POST'
     })
   }
 }

@@ -757,5 +757,8 @@ def main():
         print(f"   推奨深度: {depth.value}")
 
 
+# エイリアスを作成してcelery_appとの互換性を保つ
+TopicCollector = TopicManager
+
 if __name__ == "__main__":
     main()

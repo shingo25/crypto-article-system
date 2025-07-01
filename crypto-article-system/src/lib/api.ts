@@ -4,9 +4,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export class APIClient {
   private baseURL: string
+  private apiKey: string | undefined
 
   constructor(baseURL = API_BASE_URL) {
     this.baseURL = baseURL
+    this.apiKey = process.env.NEXT_PUBLIC_API_SECRET_KEY
   }
 
   private async request<T>(
@@ -15,11 +17,18 @@ export class APIClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
     
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    }
+    
+    // APIキーが設定されている場合は追加
+    if (this.apiKey) {
+      headers['X-API-Key'] = this.apiKey
+    }
+    
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       signal: AbortSignal.timeout(30000), // 30秒タイムアウト
       ...options,
     }

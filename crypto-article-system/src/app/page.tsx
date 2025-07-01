@@ -14,6 +14,13 @@ import { useSystemStats } from '@/hooks/useSystemStats'
 import { TopicList } from '@/components/TopicList'
 import { ArticleList } from '@/components/ArticleList'
 import { LoadingSkeleton } from '@/components/LoadingSkeleton'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { 
   Search, 
   TrendingUp, 
@@ -40,12 +47,14 @@ import {
   Wifi,
   Target,
   Brain,
-  Layout
+  Layout,
+  Menu
 } from 'lucide-react'
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
   const { 
     topics, 
@@ -144,8 +153,110 @@ export default function Dashboard() {
       } backdrop-blur-2xl border-b`}>
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            {/* Logo & Brand */}
-            <div className="flex items-center gap-4">
+            {/* Mobile Menu Button - Left Side */}
+            <div className="md:hidden">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`p-2 border-2 ${
+                      isDarkMode 
+                        ? 'border-gray-700 text-gray-300 hover:bg-gray-800 hover:border-gray-600' 
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                    }`}
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className={`w-80 ${
+                  isDarkMode 
+                    ? 'bg-gray-900 border-gray-800' 
+                    : 'bg-white border-gray-200'
+                }`}>
+                  <SheetHeader>
+                    <SheetTitle className={`text-left ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      CryptoAI Pro
+                    </SheetTitle>
+                  </SheetHeader>
+                  
+                  {/* Mobile Search */}
+                  <div className="mt-6">
+                    <div className="relative w-full">
+                      <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`} />
+                      <Input
+                        placeholder="Search topics, articles..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className={`pl-12 pr-4 py-3 w-full rounded-2xl border-0 font-medium ${
+                          isDarkMode 
+                            ? 'bg-gray-800/60 text-white placeholder:text-gray-400 focus:bg-gray-800' 
+                            : 'bg-gray-100/60 text-gray-900 placeholder:text-gray-500 focus:bg-white'
+                        } backdrop-blur-sm transition-all duration-300 focus:ring-2 focus:ring-blue-500/20`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mobile Navigation */}
+                  <div className="mt-8 space-y-4">
+                    <div className="space-y-2">
+                      <h3 className={`text-xs font-semibold uppercase tracking-wider ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        Actions
+                      </h3>
+                      
+                      <Button
+                        onClick={() => { collectTopics(); setMobileMenuOpen(false); }}
+                        disabled={isCollecting}
+                        variant="default"
+                        className="w-full justify-start bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+                      >
+                        {isCollecting ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        {isCollecting ? 'Collecting...' : 'Collect Topics'}
+                      </Button>
+                      
+                      <Button
+                        onClick={() => { 
+                          isRunning ? stopSystem() : startSystem(); 
+                          setMobileMenuOpen(false); 
+                        }}
+                        disabled={isControlling}
+                        variant={isRunning ? "destructive" : "default"}
+                        className={`w-full justify-start ${
+                          isRunning 
+                            ? "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white border-0" 
+                            : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0"
+                        }`}
+                      >
+                        {isRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                        {isControlling ? 'Processing...' : (isRunning ? 'Stop System' : 'Start System')}
+                      </Button>
+                      
+                      <Button
+                        onClick={() => { toggleTheme(); setMobileMenuOpen(false); }}
+                        variant="outline"
+                        className={`w-full justify-start border-2 ${
+                          isDarkMode 
+                            ? 'border-gray-700 text-gray-300 hover:bg-gray-800 hover:border-gray-600' 
+                            : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                        }`}
+                      >
+                        {isDarkMode ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                        {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            {/* Logo & Brand - Center on Mobile, Left on Desktop */}
+            <div className="flex items-center gap-4 flex-1 md:flex-initial justify-center md:justify-start">
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
                   <Brain className="h-7 w-7 text-white" />
@@ -153,7 +264,7 @@ export default function Dashboard() {
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-ping"></div>
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full"></div>
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
                   CryptoAI Pro
                 </h1>
@@ -185,8 +296,8 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            {/* Desktop Action Buttons */}
+            <div className="hidden md:flex items-center gap-3">
               <ActionButton
                 onClick={toggleTheme}
                 variant="outline"
@@ -223,6 +334,24 @@ export default function Dashboard() {
                 {isControlling ? 'Processing...' : (isRunning ? 'Stop' : 'Start')}
               </ActionButton>
             </div>
+
+            {/* Mobile Status Indicator */}
+            <div className="md:hidden">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+                isRunning 
+                  ? 'bg-green-500/10 border border-green-500/20' 
+                  : 'bg-gray-500/10 border border-gray-500/20'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
+                }`}></div>
+                <span className={`text-xs font-semibold ${
+                  isRunning ? 'text-green-500' : 'text-gray-500'
+                }`}>
+                  {isRunning ? 'Active' : 'Idle'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </nav>
@@ -231,7 +360,7 @@ export default function Dashboard() {
       <div className="pt-24 pb-8">
         <div className="max-w-7xl mx-auto px-6">
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-8">
             <StatCard
               icon={Target}
               title="Articles Generated"
@@ -277,14 +406,14 @@ export default function Dashboard() {
           {/* Enhanced Tabs */}
           <Tabs defaultValue="topics" className="space-y-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <TabsList className={`grid grid-cols-4 p-2 rounded-3xl w-full lg:w-auto ${
+              <TabsList className={`grid grid-cols-2 sm:grid-cols-4 p-2 rounded-3xl w-full lg:w-auto ${
                 isDarkMode 
                   ? 'bg-gray-800/50 border border-gray-700/50' 
                   : 'bg-white/50 border border-gray-200/50'
               } backdrop-blur-xl shadow-2xl`}>
                 <TabsTrigger 
                   value="topics" 
-                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white' 
                       : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white'
@@ -295,7 +424,7 @@ export default function Dashboard() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="articles" 
-                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white' 
                       : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white'
@@ -306,7 +435,7 @@ export default function Dashboard() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="generate" 
-                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white' 
                       : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white'
@@ -317,7 +446,7 @@ export default function Dashboard() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="settings" 
-                  className={`flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white' 
                       : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-400 data-[state=active]:to-gray-500 data-[state=active]:text-white'
@@ -329,7 +458,7 @@ export default function Dashboard() {
               </TabsList>
 
               {/* Quick Actions */}
-              <div className="flex gap-2">
+              <div className="hidden lg:flex gap-2">
                 <Button variant="outline" size="sm" className={`rounded-xl ${
                   isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}>
@@ -364,7 +493,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className={`rounded-3xl p-8 ${
+              <div className={`rounded-3xl p-4 sm:p-8 ${
                 isDarkMode 
                   ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
                   : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
@@ -400,7 +529,7 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              <div className={`rounded-3xl p-8 ${
+              <div className={`rounded-3xl p-4 sm:p-8 ${
                 isDarkMode 
                   ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
                   : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
@@ -423,7 +552,7 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              <div className={`rounded-3xl p-8 ${
+              <div className={`rounded-3xl p-4 sm:p-8 ${
                 isDarkMode 
                   ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
                   : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'

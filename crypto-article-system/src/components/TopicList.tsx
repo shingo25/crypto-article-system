@@ -165,7 +165,7 @@ export function TopicList({
 
   if (isLoading && topics.length === 0) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="relative">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-gray-600 to-gray-700 rounded-3xl blur opacity-30 animate-pulse"></div>
@@ -209,7 +209,7 @@ export function TopicList({
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {topics.map((topic) => (
           <TopicCard
             key={topic.id}

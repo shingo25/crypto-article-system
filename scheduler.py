@@ -32,6 +32,7 @@ class TopicCollectionScheduler:
     
     def __init__(self, api_base_url: str = "http://localhost:8000"):
         self.api_base_url = api_base_url
+        self.api_key = os.getenv("API_SECRET_KEY")
         self.scheduler = AsyncIOScheduler()
         self.is_running = False
         self.last_collection_time: Optional[datetime] = None
@@ -150,8 +151,15 @@ class TopicCollectionScheduler:
             logger.info("Starting automatic topic collection...")
             
             # トピック収集API呼び出し
+            headers = {}
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
+                
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(f"{self.api_base_url}/api/topics/collect")
+                response = await client.post(
+                    f"{self.api_base_url}/api/topics/collect",
+                    headers=headers
+                )
                 
                 if response.status_code == 200:
                     result = response.json()
@@ -193,10 +201,17 @@ class TopicCollectionScheduler:
             max_wait_time = 120  # 最大2分間待機
             check_interval = 5   # 5秒間隔でチェック
             
+            headers = {}
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
+                
             async with httpx.AsyncClient(timeout=10.0) as client:
                 for _ in range(max_wait_time // check_interval):
                     try:
-                        response = await client.get(f"{self.api_base_url}/api/tasks/{task_id}/status")
+                        response = await client.get(
+                            f"{self.api_base_url}/api/tasks/{task_id}/status",
+                            headers=headers
+                        )
                         
                         if response.status_code == 200:
                             task_status = response.json()

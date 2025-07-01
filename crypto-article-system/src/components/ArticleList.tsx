@@ -240,7 +240,7 @@ export function ArticleList({ articles, isLoading }: ArticleListProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="space-y-3 p-4 bg-slate-800/50 rounded-lg">
             <div className="flex justify-between">
@@ -294,7 +294,7 @@ export function ArticleList({ articles, isLoading }: ArticleListProps) {
       )}
       
       {/* 記事一覧 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {articles.map((article) => (
           <ArticleCard
             key={article.id}

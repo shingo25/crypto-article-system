@@ -33,6 +33,7 @@ from src.database import (
 )
 from celery_app import app as celery_app, generate_article_async, collect_topics_async
 from scheduler import get_scheduler, start_scheduler, stop_scheduler, get_scheduler_status
+from auth import get_api_key, is_public_endpoint, API_KEY_NAME
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -137,6 +138,30 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+# API認証ミドルウェア
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # OPTIONSリクエストと公開エンドポイントは認証をスキップ
+        if request.method == "OPTIONS" or is_public_endpoint(request.url.path):
+            return await call_next(request)
+        
+        # APIキーの検証
+        api_key = request.headers.get(API_KEY_NAME)
+        try:
+            await get_api_key(api_key)
+            return await call_next(request)
+        except HTTPException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"detail": e.detail}
+            )
+
+app.add_middleware(APIKeyMiddleware)
 
 # Pydantic モデル
 class SystemControlRequest(BaseModel):

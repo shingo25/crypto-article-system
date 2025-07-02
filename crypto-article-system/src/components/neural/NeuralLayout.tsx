@@ -4,7 +4,8 @@ import React, { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 import { 
   BarChart3, 
   FileText, 
@@ -21,7 +22,10 @@ import {
   X,
   Eye,
   Edit,
-  PieChart
+  PieChart,
+  User,
+  LogOut,
+  LogIn
 } from 'lucide-react'
 
 // マーケット情報駆動型ナビゲーション構造
@@ -77,8 +81,15 @@ interface NeuralLayoutProps {
 
 export function NeuralLayout({ children, currentPath }: NeuralLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout, isLoading } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  const handleLogout = async () => {
+    await logout()
+    router.push('/login')
+  }
   
   // 現在のパスから適切なセクションを決定
   const getActiveSection = () => {
@@ -161,12 +172,61 @@ export function NeuralLayout({ children, currentPath }: NeuralLayoutProps) {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-neural-elevated/50">
+      <div className="p-4 border-t border-neural-elevated/50 space-y-2">
+        {/* User Authentication */}
+        {!isLoading && (
+          <>
+            {user ? (
+              <div className="space-y-2">
+                {!isCollapsed && (
+                  <div className="px-2 py-1 text-xs text-neural-text-secondary">
+                    {user.firstName} {user.lastName}
+                    <div className="text-neural-text-muted">{user.email}</div>
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="w-full neural-button text-red-400 hover:text-red-300"
+                >
+                  <LogOut className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                  {!isCollapsed && "ログアウト"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full neural-button text-neural-cyan hover:text-neural-cyan/80"
+                  >
+                    <LogIn className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                    {!isCollapsed && "ログイン"}
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full neural-button text-neural-text-secondary hover:text-neural-text-primary"
+                  >
+                    <User className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                    {!isCollapsed && "新規登録"}
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+        
+        {/* Collapse Button */}
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="w-full neural-button"
+          className="w-full neural-button mt-2"
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           {!isCollapsed && <span className="ml-2">Collapse</span>}

@@ -25,6 +25,7 @@ interface TopicListProps {
   isLoading: boolean
   hasMore: boolean
   onLoadMore: () => void
+  isDarkMode: boolean
   getPriorityColor: (priority: string) => string
 }
 
@@ -32,11 +33,13 @@ const TopicCard = React.memo(({
   topic, 
   onGenerateArticle, 
   isGenerating, 
+  isDarkMode,
   getPriorityColor 
 }: {
   topic: Topic
   onGenerateArticle: (topicId: string) => void
   isGenerating: boolean
+  isDarkMode: boolean
   getPriorityColor: (priority: string) => string
 }) => {
   const handleGenerate = useCallback(() => {
@@ -55,9 +58,9 @@ const TopicCard = React.memo(({
       {/* Glow effect on hover */}
       <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur opacity-0 group-hover:opacity-75 transition duration-500"></div>
       
-      <Card className="relative bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 backdrop-blur-xl transition-all duration-500 group-hover:scale-[1.02] group-hover:shadow-2xl rounded-3xl overflow-hidden">
+      <Card className={`relative ${isDarkMode ? 'bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50' : 'bg-gradient-to-br from-white/80 to-gray-50/60 border border-gray-200/60'} backdrop-blur-xl transition-all duration-500 group-hover:scale-[1.02] group-hover:shadow-2xl rounded-3xl overflow-hidden`}>
         {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full -translate-y-8 translate-x-8 group-hover:scale-110 transition-transform duration-700"></div>
+        <div className={`absolute top-0 right-0 w-32 h-32 ${isDarkMode ? 'bg-gradient-to-br from-blue-500/10 to-purple-500/10' : 'bg-gradient-to-br from-blue-500/5 to-purple-500/5'} rounded-full -translate-y-8 translate-x-8 group-hover:scale-110 transition-transform duration-700`}></div>
         
         <CardContent className="p-6 relative z-10">
           {/* Header */}
@@ -67,13 +70,13 @@ const TopicCard = React.memo(({
                 <span>{priorityIcons[topic.priority as keyof typeof priorityIcons]}</span>
                 {topic.priority.toUpperCase()}
               </Badge>
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+              <div className={`flex items-center gap-2 px-3 py-1 ${isDarkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-500/10 border border-blue-500/30'} rounded-full`}>
                 <Target className="h-3 w-3 text-blue-400" />
                 <span className="text-blue-400 font-semibold text-sm">{Math.round(topic.score)}</span>
               </div>
             </div>
             <div className="text-right">
-              <div className="flex items-center gap-1 text-xs text-gray-400">
+              <div className={`flex items-center gap-1 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 <Clock className="h-3 w-3" />
                 {new Date(topic.collectedAt).toLocaleTimeString('ja-JP', { 
                   hour: '2-digit', 
@@ -84,14 +87,14 @@ const TopicCard = React.memo(({
           </div>
           
           {/* Title */}
-          <h3 className="text-white font-semibold mb-4 line-clamp-2 leading-relaxed text-lg group-hover:text-blue-300 transition-colors duration-300">
+          <h3 className={`${isDarkMode ? 'text-white group-hover:text-blue-300' : 'text-gray-800 group-hover:text-blue-600'} font-semibold mb-4 line-clamp-2 leading-relaxed text-lg transition-colors duration-300`}>
             {topic.title}
           </h3>
           
           {/* Coins */}
           <div className="flex flex-wrap gap-2 mb-4">
             {topic.coins.map(coin => (
-              <div key={coin} className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-full">
+              <div key={coin} className={`flex items-center gap-1 px-3 py-1 ${isDarkMode ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20' : 'bg-gradient-to-r from-cyan-500/15 to-blue-500/15 border border-cyan-500/30'} rounded-full`}>
                 <TrendingUp className="h-3 w-3 text-cyan-400" />
                 <span className="text-cyan-400 font-medium text-sm">{coin}</span>
               </div>
@@ -106,15 +109,15 @@ const TopicCard = React.memo(({
                   href={topic.sourceUrl} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 hover:bg-gray-600/50 rounded-xl transition-all duration-300 hover:scale-105"
+                  className={`flex items-center gap-2 px-3 py-1 ${isDarkMode ? 'bg-gray-700/50 hover:bg-gray-600/50' : 'bg-gray-200/60 hover:bg-gray-300/60'} rounded-xl transition-all duration-300 hover:scale-105`}
                 >
-                  <ExternalLink className="h-3 w-3 text-gray-400" />
-                  <span className="text-gray-400 hover:text-white text-sm font-medium">{topic.source}</span>
+                  <ExternalLink className={`h-3 w-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                  <span className={`${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-800'} text-sm font-medium`}>{topic.source}</span>
                 </a>
               ) : topic.source && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 rounded-xl">
-                  <ExternalLink className="h-3 w-3 text-gray-400" />
-                  <span className="text-gray-400 text-sm font-medium">{topic.source}</span>
+                <div className={`flex items-center gap-2 px-3 py-1 ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-200/60'} rounded-xl`}>
+                  <ExternalLink className={`h-3 w-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                  <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-sm font-medium`}>{topic.source}</span>
                 </div>
               )}
             </div>
@@ -150,6 +153,7 @@ export function TopicList({
   isLoading, 
   hasMore, 
   onLoadMore, 
+  isDarkMode,
   getPriorityColor 
 }: TopicListProps) {
   const { generateArticle, isGenerating } = useArticles()
@@ -197,8 +201,8 @@ export function TopicList({
         <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
           <div className="text-4xl">📭</div>
         </div>
-        <div className="text-white text-2xl font-bold mb-2">No Topics Found</div>
-        <div className="text-gray-400 text-lg mb-6">Start the system to begin collecting topics</div>
+        <div className={`${isDarkMode ? 'text-white' : 'text-gray-800'} text-2xl font-bold mb-2`}>No Topics Found</div>
+        <div className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-lg mb-6`}>Start the system to begin collecting topics</div>
         <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl px-8 py-3 font-semibold">
           <Sparkles className="h-4 w-4 mr-2" />
           Start Collection
@@ -216,6 +220,7 @@ export function TopicList({
             topic={topic}
             onGenerateArticle={generateArticle}
             isGenerating={isGenerating}
+            isDarkMode={isDarkMode}
             getPriorityColor={getPriorityColor}
           />
         ))}

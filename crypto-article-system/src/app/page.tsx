@@ -410,87 +410,87 @@ export default function Dashboard() {
           {/* Enhanced Tabs */}
           <Tabs defaultValue="topics" className="space-y-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <TabsList className={`grid grid-cols-3 sm:grid-cols-7 p-2 rounded-3xl w-full lg:w-auto ${
+              <TabsList className={`grid grid-cols-3 sm:grid-cols-7 p-1.5 rounded-3xl w-full lg:w-auto ${
                 isDarkMode 
-                  ? 'bg-gray-800/50 border border-gray-700/50' 
-                  : 'bg-white/80 border border-gray-300/50 shadow-lg'
+                  ? 'bg-gray-800/60 border border-gray-700/40 shadow-2xl' 
+                  : 'bg-white/90 border border-gray-200/70 shadow-xl'
               } backdrop-blur-xl`}>
                 <TabsTrigger 
                   value="topics" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <Globe className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Topics</span>
+                  <span className="hidden sm:inline text-sm font-medium">Topics</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="articles" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <FileText className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Articles</span>
+                  <span className="hidden sm:inline text-sm font-medium">Articles</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="generate" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <Sparkles className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Generate</span>
+                  <span className="hidden sm:inline text-sm font-medium">Generate</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="market" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-blue-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-blue-600 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <Activity className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Market</span>
+                  <span className="hidden sm:inline text-sm font-medium">Market</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="tenant" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <Layers className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Tenant</span>
+                  <span className="hidden sm:inline text-sm font-medium">Tenant</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="distribution" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <Send className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Dist</span>
+                  <span className="hidden sm:inline text-sm font-medium">Dist</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="settings" 
-                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 py-0 font-semibold transition-all duration-300 h-11 ${
                     isDarkMode 
-                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white hover:bg-gray-100'
+                      ? 'text-gray-400 hover:text-white hover:bg-gray-700/60 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white data-[state=active]:shadow-lg' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/70 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white data-[state=active]:shadow-lg'
                   }`}
                 >
                   <Settings className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline text-xs sm:text-sm">Settings</span>
+                  <span className="hidden sm:inline text-sm font-medium">Settings</span>
                 </TabsTrigger>
               </TabsList>
 

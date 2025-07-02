@@ -1,4 +1,6 @@
 import { logger, LogContext } from './simple-logger'
+import { z } from 'zod'
+import { NextResponse } from 'next/server'
 // import * as Sentry from '@sentry/nextjs'
 
 // エラータイプの定義
@@ -75,6 +77,28 @@ export class ValidationError extends AppError {
       userMessage: `入力エラー: ${message}`,
       context: { ...context, field }
     })
+  }
+}
+
+export class ZodValidationError extends AppError {
+  constructor(zodError: z.ZodError, context?: LogContext) {
+    const fieldErrors = zodError.errors.map(error => ({
+      field: error.path.join('.'),
+      message: error.message,
+      code: error.code
+    }))
+
+    super('Validation failed', {
+      type: ErrorType.VALIDATION_ERROR,
+      code: 'ZOD_VALIDATION_FAILED',
+      statusCode: 400,
+      userMessage: '入力データに不正な値が含まれています',
+      context: { ...context, fieldErrors, totalErrors: zodError.errors.length }
+    })
+  }
+
+  static fromZodError(error: z.ZodError, context?: LogContext): ZodValidationError {
+    return new ZodValidationError(error, context)
   }
 }
 
@@ -177,29 +201,29 @@ export class GlobalErrorHandler {
 
       // Sentryにレポート（必要に応じて）
       if (error.statusCode >= 500) {
-        Sentry.withScope((scope) => {
-          const sentryContext = error.getSentryContext()
-          Object.entries(sentryContext.tags).forEach(([key, value]) => {
-            scope.setTag(key, value)
-          })
-          Object.entries(sentryContext.extra).forEach(([key, value]) => {
-            scope.setExtra(key, value)
-          })
-          scope.setLevel('error')
-          Sentry.captureException(error)
-        })
+        // Sentry.withScope((scope) => {
+        //   const sentryContext = error.getSentryContext()
+        //   Object.entries(sentryContext.tags).forEach(([key, value]) => {
+        //     scope.setTag(key, value)
+        //   })
+        //   Object.entries(sentryContext.extra).forEach(([key, value]) => {
+        //     scope.setExtra(key, value)
+        //   })
+        //   scope.setLevel('error')
+        //   Sentry.captureException(error)
+        // })
       }
     } else {
       // 一般的なエラー
       logger.error('Unhandled error occurred', error, enrichedContext)
       
-      Sentry.withScope((scope) => {
-        Object.entries(enrichedContext).forEach(([key, value]) => {
-          scope.setTag(key, String(value))
-        })
-        scope.setLevel('error')
-        Sentry.captureException(error)
-      })
+      // Sentry.withScope((scope) => {
+      //   Object.entries(enrichedContext).forEach(([key, value]) => {
+      //     scope.setTag(key, String(value))
+      //   })
+      //   scope.setLevel('error')
+      //   Sentry.captureException(error)
+      // })
     }
   }
 
@@ -296,6 +320,45 @@ export const handleError = (error: Error | AppError, context?: LogContext) => {
 
 export const formatApiError = (error: Error | AppError) => {
   return globalErrorHandler.formatErrorResponse(error)
+}
+
+// 統一されたAPIエラーレスポンス生成関数
+export function createErrorResponse(error: unknown, context?: LogContext): NextResponse {
+  let appError: AppError
+
+  // エラーの種類に応じて適切なAppErrorに変換
+  if (error instanceof AppError) {
+    appError = error
+  } else if (error instanceof z.ZodError) {
+    appError = ZodValidationError.fromZodError(error, context)
+  } else if (error instanceof Error) {
+    appError = new AppError(error.message, {
+      type: ErrorType.SYSTEM_ERROR,
+      statusCode: 500,
+      userMessage: 'システムエラーが発生しました',
+      context
+    })
+  } else {
+    appError = new AppError('Unknown error occurred', {
+      type: ErrorType.SYSTEM_ERROR,
+      statusCode: 500,
+      userMessage: '予期しないエラーが発生しました',
+      context
+    })
+  }
+
+  // エラーをログに記録
+  globalErrorHandler.logError(appError, context)
+
+  // 統一されたレスポンス形式で返す
+  const errorResponse = globalErrorHandler.formatErrorResponse(appError)
+  
+  return NextResponse.json(errorResponse, { 
+    status: appError.statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
 }
 
 // エラー回復用のユーティリティ

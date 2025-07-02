@@ -1,138 +1,88 @@
-'use client'
-
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { apiClient } from '@/lib/api'
+import { mockTopics } from '@/lib/mockData'
 import toast from 'react-hot-toast'
 
-interface Topic {
-  id: string
-  title: string
-  priority: 'urgent' | 'high' | 'medium' | 'low'
-  score: number
-  coins: string[]
-  collectedAt: string
-  source?: string
-  sourceUrl?: string
-}
-
-interface TopicFilters {
-  priority: string
-  source: string
-  sortBy: 'score' | 'time' | 'title'
-}
-
 export function useTopics() {
-  const queryClient = useQueryClient()
-  const [filters, setFilters] = useState<TopicFilters>({
-    priority: '',
-    source: '',
-    sortBy: 'time'
-  })
+  const { topics, setTopics } = useWorkspaceStore()
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [offset, setOffset] = useState(0)
-  const limit = 50
 
-  // トピック一覧取得
-  const {
-    data: topicsData,
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ['topics', filters, offset],
-    queryFn: async () => {
+  const loadTopics = async (isRefresh = false) => {
+    try {
+      setIsLoading(true)
+      const currentOffset = isRefresh ? 0 : offset
+      
+      // 実際のAPIからトピックを取得
       const response = await apiClient.getTopics({
-        limit,
-        offset,
-        sortBy: filters.sortBy,
-        priority: filters.priority || undefined,
-        source: filters.source || undefined
+        limit: 20,
+        offset: currentOffset,
+        sortBy: 'created_at'
       })
-      return response
-    },
-    staleTime: 30 * 1000, // 30秒間はキャッシュを使用
-    refetchInterval: 5 * 60 * 1000, // 5分ごとに自動更新
-    refetchIntervalInBackground: true, // バックグラウンドでも更新
-  })
 
-  // トピック削除ミューテーション
-  const deleteMutation = useMutation({
-    mutationFn: (topicId: string) => apiClient.deleteTopic(topicId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['topics'] })
-      toast.success('トピックを削除しました')
-    },
-    onError: (error) => {
-      toast.error(`削除に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  })
+      const newTopics = response.topics || []
+      
+      // ワークスペースストアの期待する形式に変換
+      const formattedTopics = newTopics.map((topic: any) => ({
+        id: topic.id || topic.title?.substring(0, 8) || Math.random().toString(36).substring(7),
+        summary: topic.title || topic.summary || 'No title',
+        coins: topic.coins || [],
+        timestamp: topic.created_at || topic.timestamp || new Date().toISOString(),
+        status: topic.status || 'active',
+        priority: topic.priority || 'medium',
+        tags: topic.tags || [],
+        source: topic.source
+      }))
 
-  // 複数トピック削除ミューテーション
-  const deleteMultipleMutation = useMutation({
-    mutationFn: (topicIds: string[]) => 
-      Promise.all(topicIds.map(id => apiClient.deleteTopic(id))),
-    onSuccess: (_, topicIds) => {
-      queryClient.invalidateQueries({ queryKey: ['topics'] })
-      toast.success(`${topicIds.length}件のトピックを削除しました`)
-    },
-    onError: (error) => {
-      toast.error(`一括削除に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  })
+      if (isRefresh) {
+        setTopics(formattedTopics)
+        setOffset(formattedTopics.length)
+      } else {
+        setTopics([...topics, ...formattedTopics])
+        setOffset(offset + formattedTopics.length)
+      }
 
-  // トピック優先度更新ミューテーション
-  const updatePriorityMutation = useMutation({
-    mutationFn: ({ topicId, priority }: { topicId: string; priority: string }) =>
-      apiClient.updateTopicPriority(topicId, priority),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['topics'] })
-      toast.success('優先度を更新しました')
-    },
-    onError: (error) => {
-      toast.error(`更新に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  })
+      setHasMore(formattedTopics.length === 20) // 20件取得できた場合はまだ続きがある
 
-  // より多くのトピックを読み込み
-  const loadMoreTopics = () => {
-    if (topicsData?.pagination?.hasMore) {
-      setOffset(prev => prev + limit)
+    } catch (error) {
+      console.error('Failed to load topics:', error)
+      toast.error('トピックの読み込みに失敗しました')
+      
+      // フォールバックとしてモックデータを使用
+      if (topics.length === 0) {
+        const formattedMockTopics = mockTopics.map(topic => ({
+          ...topic,
+          timestamp: topic.timestamp || new Date().toISOString()
+        }))
+        setTopics(formattedMockTopics)
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // フィルターリセット
-  const resetFilters = () => {
-    setFilters({
-      priority: '',
-      source: '',
-      sortBy: 'time'
-    })
-    setOffset(0)
+  useEffect(() => {
+    // 初回読み込み
+    loadTopics(true)
+  }, [])
+
+  const loadMoreTopics = async () => {
+    if (!isLoading && hasMore) {
+      await loadTopics(false)
+    }
+  }
+
+  const refreshTopics = async () => {
+    await loadTopics(true)
   }
 
   return {
-    // データ
-    topics: topicsData?.topics || [],
-    hasMore: topicsData?.pagination?.hasMore || false,
-    totalCount: topicsData?.pagination?.total || 0,
-    
-    // 状態
+    topics,
     isLoading,
-    error,
-    filters,
-    
-    // アクション
-    setFilters,
-    resetFilters,
+    hasMore,
     loadMoreTopics,
-    refetch,
-    deleteTopic: deleteMutation.mutate,
-    deleteMultipleTopics: deleteMultipleMutation.mutate,
-    updateTopicPriority: updatePriorityMutation.mutate,
-    
-    // ローディング状態
-    isDeleting: deleteMutation.isPending,
-    isDeletingMultiple: deleteMultipleMutation.isPending,
-    isUpdatingPriority: updatePriorityMutation.isPending,
+    refreshTopics
   }
 }

@@ -1,0 +1,338 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ========================================
+// User Management & Authentication
+// ========================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String   // bcrypt hashed password
+  
+  // Profile
+  firstName String?
+  lastName  String?
+  avatar    String?
+  
+  // Permissions
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  
+  // Authentication
+  lastLoginAt    DateTime?
+  emailVerified  Boolean @default(false)
+  emailVerifiedAt DateTime?
+  
+  // Settings
+  preferences Json?  // User preferences/settings
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  articles  Article[]
+  sessions  UserSession[]
+  
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  sessionToken String @unique
+  
+  // Session info
+  userAgent String?
+  ipAddress String?
+  
+  // Expiration
+  expiresAt DateTime
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+}
+
+// ========================================
+// Core Models for Content Management
+// ========================================
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  content     String?
+  summary     String?
+  slug        String   @unique
+  status      ArticleStatus @default(DRAFT)
+  
+  // Author
+  authorId    String?
+  author      User?    @relation(fields: [authorId], references: [id])
+  
+  // SEO & Metadata
+  metaTitle       String?
+  metaDescription String?
+  tags            Json? // Array of strings
+  keywords        Json? // Array of strings
+  
+  // Source & Generation
+  sourceType      SourceType @default(MANUAL)
+  sourceData      Json?      // Market data, alert info, etc.
+  generatedBy     String?    // AI model used
+  templateId      String?
+  template        Template?  @relation(fields: [templateId], references: [id])
+  
+  // Publishing
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  
+  // Analytics & Performance
+  viewCount       Int @default(0)
+  shareCount      Int @default(0)
+  engagementRate  Float @default(0)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  versions    ArticleVersion[]
+  analytics   ArticleAnalytics[]
+  
+  @@map("articles")
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  content     String   // Template content with placeholders
+  variables   Json     // Template variables definition
+  category    String?
+  
+  // Usage stats
+  usageCount  Int @default(0)
+  lastUsedAt  DateTime?
+  
+  // Template settings
+  isActive    Boolean @default(true)
+  isSystem    Boolean @default(false) // System templates vs user templates
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  articles    Article[]
+  
+  @@map("templates")
+}
+
+model ArticleVersion {
+  id        String   @id @default(cuid())
+  articleId String
+  version   Int
+  title     String
+  content   String
+  changes   String?  // Description of changes
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  
+  @@unique([articleId, version])
+  @@map("article_versions")
+}
+
+model ArticleAnalytics {
+  id        String   @id @default(cuid())
+  articleId String
+  date      DateTime
+  
+  // Traffic metrics
+  views     Int @default(0)
+  uniqueViews Int @default(0)
+  shares    Int @default(0)
+  comments  Int @default(0)
+  
+  // Engagement metrics
+  avgReadTime    Float @default(0) // in seconds
+  bounceRate     Float @default(0) // percentage
+  engagementRate Float @default(0) // percentage
+  
+  // Source tracking
+  trafficSources Json? // {direct: 100, social: 50, search: 30}
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  
+  @@unique([articleId, date])
+  @@map("article_analytics")
+}
+
+// ========================================
+// Market & News Models
+// ========================================
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String?
+  content     String?
+  url         String   @unique
+  imageUrl    String?
+  
+  // Source information
+  source      String   // e.g., "CoinDesk", "CoinTelegraph"
+  author      String?
+  
+  // AI Analysis
+  sentiment   Float?   // -1 to 1 (negative to positive)
+  importance  Int @default(1) // 1-10 scale
+  aiSummary   String?
+  topics      Json? // extracted topics/tags
+  coins       Json? // mentioned cryptocurrencies
+  
+  // Article generation
+  hasGeneratedArticle Boolean @default(false)
+  generatedArticleId  String?
+  
+  // Timestamps
+  publishedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("news_items")
+}
+
+model PriceAlert {
+  id          String   @id @default(cuid())
+  coin        String   // e.g., "BTC", "ETH"
+  alertType   AlertType
+  condition   Json     // Alert condition config
+  
+  // Alert settings
+  isActive    Boolean @default(true)
+  message     String?
+  
+  // Auto-generation settings
+  autoGenerate Boolean @default(false)
+  templateId   String?
+  
+  // Trigger tracking
+  lastTriggered DateTime?
+  triggerCount  Int @default(0)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("price_alerts")
+}
+
+model AlertTrigger {
+  id          String   @id @default(cuid())
+  alertId     String
+  triggerData Json     // Actual values when triggered
+  
+  // Generated content
+  articleGenerated Boolean @default(false)
+  articleId        String?
+  
+  // Timestamps
+  triggeredAt DateTime @default(now())
+  
+  @@map("alert_triggers")
+}
+
+// ========================================
+// System & Configuration Models
+// ========================================
+
+model SystemMetrics {
+  id        String   @id @default(cuid())
+  date      DateTime
+  
+  // Content metrics
+  articlesGenerated Int @default(0)
+  templatesUsed     Int @default(0)
+  newsProcessed     Int @default(0)
+  alertsTriggered   Int @default(0)
+  
+  // System metrics
+  apiRequests       Int @default(0)
+  aiTokensUsed      Int @default(0)
+  systemUptime      Float @default(0) // percentage
+  
+  // Performance metrics
+  avgResponseTime   Float @default(0) // milliseconds
+  errorCount        Int @default(0)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@unique([date])
+  @@map("system_metrics")
+}
+
+// ========================================
+// Enums
+// ========================================
+
+enum UserRole {
+  ADMIN       // Full system access
+  EDITOR      // Can edit and publish articles
+  AUTHOR      // Can create and edit own articles
+  USER        // Read-only access
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SourceType {
+  MANUAL      // Manually created
+  MARKET      // From market data
+  ALERT       // From price alert
+  NEWS        // From news feed
+  TEMPLATE    // From template
+  AI_SUGGESTED // AI suggested topic
+}
+
+enum AlertType {
+  PRICE_ABOVE     // Price goes above threshold
+  PRICE_BELOW     // Price goes below threshold
+  PRICE_CHANGE    // Price change percentage
+  VOLUME_SURGE    // Volume surge
+  TECHNICAL       // Technical indicator
+}

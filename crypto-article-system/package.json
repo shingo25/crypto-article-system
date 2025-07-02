@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@prisma/client": "^6.11.0",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-progress": "^1.1.7",
@@ -18,15 +19,21 @@
     "@sentry/nextjs": "^9.34.0",
     "@tanstack/react-query": "^5.81.5",
     "@tanstack/react-query-devtools": "^5.81.5",
+    "@tanstack/react-table": "^8.21.3",
+    "@types/bcryptjs": "^2.4.6",
     "@types/dompurify": "^3.0.5",
     "@types/ioredis": "^4.28.10",
+    "@types/jsonwebtoken": "^9.0.10",
+    "bcryptjs": "^3.0.2",
     "bullmq": "^5.56.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dompurify": "^3.2.6",
     "ioredis": "^5.6.1",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.523.0",
     "next": "15.3.4",
+    "prisma": "^6.11.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
@@ -34,7 +41,9 @@
     "recharts": "^3.0.2",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "zod": "^3.25.67",
+    "zustand": "^5.0.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

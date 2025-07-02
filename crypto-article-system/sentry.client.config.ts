@@ -29,12 +29,12 @@ Sentry.init({
     // 機密情報をマスク
     if (event.request?.data) {
       const data = event.request.data
-      if (typeof data === 'object') {
+      if (typeof data === 'object' && data !== null) {
         // APIキーや秘密情報をマスク
         const sensitiveKeys = ['apiKey', 'password', 'secret', 'token', 'key']
         sensitiveKeys.forEach(key => {
-          if (data[key]) {
-            data[key] = '[REDACTED]'
+          if ((data as Record<string, any>)[key]) {
+            (data as Record<string, any>)[key] = '[REDACTED]'
           }
         })
       }
@@ -44,12 +44,7 @@ Sentry.init({
   },
   
   // パフォーマンス監視の設定
-  integrations: [
-    new Sentry.BrowserTracing({
-      // ルーターの変更を追跡
-      routingInstrumentation: Sentry.nextRouterInstrumentation,
-    }),
-  ],
+  integrations: [],
   
   // エラーレベルのフィルタリング
   initialScope: {

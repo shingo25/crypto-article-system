@@ -1,5 +1,5 @@
 // Client-side compatible logger
-// import winston from 'winston'
+import winston from 'winston'
 // import * as Sentry from '@sentry/nextjs'
 
 // ログレベルの定義
@@ -95,17 +95,17 @@ export class StructuredLogger {
   private constructor() {
     this.winston = winstonLogger
     
-    // Sentry初期化
-    if (process.env.SENTRY_DSN) {
-      Sentry.init({
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV || 'development',
-        tracesSampleRate: 1.0,
-        integrations: [
-          new Sentry.Integrations.Http({ tracing: true }),
-        ]
-      })
-    }
+    // Sentry初期化 (無効化)
+    // if (process.env.SENTRY_DSN) {
+    //   Sentry.init({
+    //     dsn: process.env.SENTRY_DSN,
+    //     environment: process.env.NODE_ENV || 'development',
+    //     tracesSampleRate: 1.0,
+    //     integrations: [
+    //       new Sentry.Integrations.Http({ tracing: true }),
+    //     ]
+    //   })
+    // }
   }
 
   public static getInstance(): StructuredLogger {
@@ -125,12 +125,12 @@ export class StructuredLogger {
     const enrichedContext = this.enrichContext(context)
     this.winston.info(message, enrichedContext)
     
-    // Sentryにブレッドクラムを追加
-    Sentry.addBreadcrumb({
-      message,
-      level: 'info',
-      data: enrichedContext
-    })
+    // Sentryにブレッドクラムを追加 (無効化)
+    // Sentry.addBreadcrumb({
+    //   message,
+    //   level: 'info',
+    //   data: enrichedContext
+    // })
   }
 
   // 警告ログ
@@ -138,11 +138,11 @@ export class StructuredLogger {
     const enrichedContext = this.enrichContext(context)
     this.winston.warn(message, enrichedContext)
     
-    Sentry.addBreadcrumb({
-      message,
-      level: 'warning',
-      data: enrichedContext
-    })
+    // Sentry.addBreadcrumb({
+    //   message,
+    //   level: 'warning',
+    //   data: enrichedContext
+    // })
   }
 
   // エラーログ
@@ -156,14 +156,14 @@ export class StructuredLogger {
         stack: error.stack
       }
       
-      // Sentryにエラーを送信
-      Sentry.withScope((scope) => {
-        Object.entries(enrichedContext).forEach(([key, value]) => {
-          scope.setTag(key, String(value))
-        })
-        scope.setLevel('error')
-        Sentry.captureException(error)
-      })
+      // Sentryにエラーを送信 (無効化)
+      // Sentry.withScope((scope) => {
+      //   Object.entries(enrichedContext).forEach(([key, value]) => {
+      //     scope.setTag(key, String(value))
+      //   })
+      //   scope.setLevel('error')
+      //   Sentry.captureException(error)
+      // })
     }
     
     this.winston.error(message, enrichedContext)
@@ -229,16 +229,16 @@ export class StructuredLogger {
       event
     })
     
-    // セキュリティイベントはSentryに即座に送信
-    Sentry.withScope((scope) => {
-      scope.setLevel('warning')
-      scope.setTag('type', 'security')
-      scope.setTag('event', event)
-      Object.entries(context).forEach(([key, value]) => {
-        scope.setTag(key, String(value))
-      })
-      Sentry.captureMessage(`Security Event: ${event}`)
-    })
+    // セキュリティイベントはSentryに即座に送信 (無効化)
+    // Sentry.withScope((scope) => {
+    //   scope.setLevel('warning')
+    //   scope.setTag('type', 'security')
+    //   scope.setTag('event', event)
+    //   Object.entries(context).forEach(([key, value]) => {
+    //     scope.setTag(key, String(value))
+    //   })
+    //   Sentry.captureMessage(`Security Event: ${event}`)
+    // })
   }
 
   // パフォーマンスログ

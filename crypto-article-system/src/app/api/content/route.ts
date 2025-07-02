@@ -2,63 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { contentDistributionManager } from '@/lib/content-distribution'
 import { createComponentLogger } from '@/lib/simple-logger'
 import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
+import { requireAuth } from '@/lib/auth'
+import { withRateLimit } from '@/lib/rate-limit'
+import { 
+  CreateContentSchema, 
+  ContentSearchSchema, 
+  sanitizeContent, 
+  sanitizeTitle, 
+  containsSuspiciousContent 
+} from '@/lib/validation/content'
+import { z } from 'zod'
 
 const componentLogger = createComponentLogger('ContentAPI')
 
 // コンテンツ一覧取得
-export async function GET(request: NextRequest) {
+const getContentHandler = requireAuth(async (request: NextRequest, user) => {
   const startTime = Date.now()
   
   try {
-    const searchParams = request.nextUrl.searchParams
-    const tenantId = searchParams.get('tenantId')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100) // 最大100件
-    
-    // フィルタパラメータ
-    const categories = searchParams.get('categories')?.split(',')
-    const tags = searchParams.get('tags')?.split(',')
-    const status = searchParams.get('status')?.split(',') as any[]
-    const priority = searchParams.get('priority')?.split(',') as any[]
-    const language = searchParams.get('language')?.split(',')
-    const sentiment = searchParams.get('sentiment')?.split(',') as any[]
-    const minConfidence = searchParams.get('minConfidence') ? parseFloat(searchParams.get('minConfidence')!) : undefined
-    const from = searchParams.get('from')
-    const to = searchParams.get('to')
+    // URLパラメータを検証
+    const searchParams = Object.fromEntries(request.nextUrl.searchParams.entries())
+    const validatedParams = ContentSearchSchema.parse(searchParams)
 
-    if (!tenantId) {
-      throw new AppError('Tenant ID is required', {
-        type: ErrorType.VALIDATION_ERROR,
-        code: 'MISSING_TENANT_ID',
-        statusCode: 400,
-        userMessage: 'テナントIDが必要です'
-      })
-    }
+    componentLogger.info('コンテンツ一覧を取得中', { 
+      tenantId: validatedParams.tenantId, 
+      page: validatedParams.page, 
+      limit: validatedParams.limit,
+      userId: user.userId,
+      role: user.role
+    })
 
     // フィルタ構築
     const filter: any = {}
-    if (categories) filter.categories = categories
-    if (tags) filter.tags = tags
-    if (status) filter.status = status
-    if (priority) filter.priority = priority
-    if (language) filter.language = language
-    if (sentiment) filter.sentiment = sentiment
-    if (minConfidence !== undefined) filter.minConfidence = minConfidence
-    if (from && to) filter.dateRange = { from, to }
+    if (validatedParams.categories) filter.categories = validatedParams.categories
+    if (validatedParams.tags) filter.tags = validatedParams.tags
+    if (validatedParams.status) filter.status = validatedParams.status
+    if (validatedParams.priority) filter.priority = validatedParams.priority
+    if (validatedParams.language) filter.language = validatedParams.language
+    if (validatedParams.sentiment) filter.sentiment = validatedParams.sentiment
+    if (validatedParams.minConfidence !== undefined) filter.minConfidence = validatedParams.minConfidence
+    if (validatedParams.from && validatedParams.to) filter.dateRange = { from: validatedParams.from, to: validatedParams.to }
 
-    componentLogger.info('コンテンツ一覧を取得中', { 
-      tenantId, 
-      page, 
-      limit, 
-      filterCount: Object.keys(filter).length 
-    })
-
-    const result = await contentDistributionManager.getContent(tenantId, filter, page, limit)
+    const result = await contentDistributionManager.getContent(validatedParams.tenantId, filter, validatedParams.page, validatedParams.limit)
 
     componentLogger.performance('コンテンツ一覧取得', Date.now() - startTime, {
-      tenantId,
+      tenantId: validatedParams.tenantId,
       resultCount: result.content.length,
-      total: result.total
+      total: result.total,
+      userId: user.userId
     })
 
     return NextResponse.json({
@@ -78,8 +69,17 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     componentLogger.error('コンテンツ一覧取得に失敗', error as Error, {
-      duration: Date.now() - startTime
+      duration: Date.now() - startTime,
+      userId: user.userId
     })
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({
+        success: false,
+        error: 'バリデーションエラー',
+        details: error.errors
+      }, { status: 400 })
+    }
 
     if (error instanceof AppError) {
       return NextResponse.json(formatApiError(error), { status: error.statusCode })
@@ -93,52 +93,55 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(formatApiError(appError), { status: 500 })
   }
-}
+})
 
 // コンテンツ登録
-export async function POST(request: NextRequest) {
+const postContentHandler = requireAuth(async (request: NextRequest, user) => {
   const startTime = Date.now()
   
   try {
     const body = await request.json()
-    const {
-      tenantId,
-      type,
-      title,
-      content,
-      summary,
-      metadata,
-      distribution
-    } = body
+    const validatedData = CreateContentSchema.parse(body)
 
-    // バリデーション
-    if (!tenantId || !type || !title || !content) {
-      throw new AppError('Missing required fields', {
+    // セキュリティチェック
+    if (containsSuspiciousContent(validatedData.content)) {
+      throw new AppError('Suspicious content detected', {
         type: ErrorType.VALIDATION_ERROR,
-        code: 'MISSING_REQUIRED_FIELDS',
+        code: 'SUSPICIOUS_CONTENT',
         statusCode: 400,
-        userMessage: '必須フィールドが不足しています'
+        userMessage: '不正なコンテンツが検出されました'
       })
     }
 
-    if (!['article', 'topic', 'analysis'].includes(type)) {
-      throw new AppError('Invalid content type', {
+    if (containsSuspiciousContent(validatedData.title)) {
+      throw new AppError('Suspicious title detected', {
         type: ErrorType.VALIDATION_ERROR,
-        code: 'INVALID_CONTENT_TYPE',
+        code: 'SUSPICIOUS_TITLE',
         statusCode: 400,
-        userMessage: '無効なコンテンツタイプです'
+        userMessage: '不正なタイトルが検出されました'
       })
     }
 
-    componentLogger.info('コンテンツを登録中', { tenantId, type, title })
+    // コンテンツをサニタイズ
+    const sanitizedTitle = sanitizeTitle(validatedData.title)
+    const sanitizedContent = sanitizeContent(validatedData.content)
+    const sanitizedSummary = validatedData.summary ? sanitizeContent(validatedData.summary) : undefined
+
+    componentLogger.info('コンテンツを登録中', { 
+      tenantId: validatedData.tenantId, 
+      type: validatedData.type, 
+      title: sanitizedTitle,
+      userId: user.userId,
+      role: user.role
+    })
 
     // デフォルト値設定
     const contentData = {
-      tenantId,
-      type,
-      title,
-      content,
-      summary: summary || title,
+      tenantId: validatedData.tenantId,
+      type: validatedData.type,
+      title: sanitizedTitle,
+      content: sanitizedContent,
+      summary: sanitizedSummary || sanitizedTitle,
       metadata: {
         tags: [],
         categories: [],
@@ -147,15 +150,16 @@ export async function POST(request: NextRequest) {
         status: 'published' as const,
         priority: 'medium' as const,
         language: 'ja',
-        readingTime: Math.ceil(content.length / 200), // 概算読了時間
-        wordCount: content.length,
-        ...metadata
+        readingTime: Math.ceil(sanitizedContent.length / 200), // 概算読了時間
+        wordCount: sanitizedContent.length,
+        authorId: user.userId, // 作成者を記録
+        ...validatedData.metadata
       },
       distribution: {
         channels: [],
         publishedChannels: [],
         failedChannels: [],
-        ...distribution
+        ...validatedData.distribution
       }
     }
 
@@ -164,7 +168,8 @@ export async function POST(request: NextRequest) {
     componentLogger.business('コンテンツ登録完了', {
       contentId: registeredContent.id,
       type: registeredContent.type,
-      tenantId,
+      tenantId: validatedData.tenantId,
+      userId: user.userId,
       duration: Date.now() - startTime
     })
 
@@ -175,8 +180,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     componentLogger.error('コンテンツ登録に失敗', error as Error, {
-      duration: Date.now() - startTime
+      duration: Date.now() - startTime,
+      userId: user.userId
     })
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({
+        success: false,
+        error: 'バリデーションエラー',
+        details: error.errors
+      }, { status: 400 })
+    }
 
     if (error instanceof AppError) {
       return NextResponse.json(formatApiError(error), { status: error.statusCode })
@@ -190,4 +204,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(formatApiError(appError), { status: 500 })
   }
-}
+})
+
+// レート制限を適用してエクスポート
+export const GET = withRateLimit(getContentHandler, 'public')
+export const POST = withRateLimit(postContentHandler, 'content')

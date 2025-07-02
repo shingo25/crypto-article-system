@@ -31,9 +31,10 @@ export default function RootLayout({
   }
 
   return (
-    <html lang="ja">
+    <html lang="ja" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         {/* AppProviderでchildrenをラップする */}
         <AppProvider>{children}</AppProvider>

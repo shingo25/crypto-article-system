@@ -1,0 +1,143 @@
+# 開発環境用のDocker Compose設定
+version: '3.8'
+
+services:
+  # PostgreSQL データベース（開発用）
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: crypto-article-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crypto_articles_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+    networks:
+      - crypto-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crypto_articles_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis（開発用）
+  redis-dev:
+    image: redis:7-alpine
+    container_name: crypto-article-redis-dev
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - crypto-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Redis Insight（開発用）
+  redis-insight-dev:
+    image: redislabs/redisinsight:latest
+    container_name: crypto-article-redis-insight-dev
+    restart: unless-stopped
+    volumes:
+      - redis_insight_dev_data:/db
+    ports:
+      - "8003:8001"
+    depends_on:
+      - redis-dev
+    networks:
+      - crypto-dev-network
+
+  # pgAdmin（開発用）
+  pgadmin-dev:
+    image: dpage/pgadmin4:latest
+    container_name: crypto-article-pgadmin-dev
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@example.com
+      PGADMIN_DEFAULT_PASSWORD: dev
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    ports:
+      - "8004:80"
+    depends_on:
+      - postgres-dev
+    networks:
+      - crypto-dev-network
+
+  # メールキャッチャー（開発用）
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: crypto-article-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - crypto-dev-network
+
+  # テスト用のNext.jsアプリ（ホットリロード付き）
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: crypto-article-app-dev
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:dev_password@postgres-dev:5432/crypto_articles_dev
+      - REDIS_URL=redis://redis-dev:6379
+      - NEXTAUTH_URL=http://localhost:3002
+      - NEXTAUTH_SECRET=dev-secret-key
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - SMTP_USER=
+      - SMTP_PASS=
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - app_dev_logs:/app/logs
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+    networks:
+      - crypto-dev-network
+    command: npm run dev
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  redis_insight_dev_data:
+    driver: local
+  pgadmin_dev_data:
+    driver: local
+  app_dev_logs:
+    driver: local
+
+networks:
+  crypto-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

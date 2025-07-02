@@ -8,6 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import SettingsPage from '@/components/SettingsPage'
 import ArticleGenerationForm from '@/components/ArticleGenerationForm'
+import MarketDashboard from '@/components/MarketDashboard'
+import TenantDashboard from '@/components/TenantDashboard'
+import ContentDistributionDashboard from '@/components/ContentDistributionDashboard'
 import { useTopics } from '@/hooks/useTopics'
 import { useArticles } from '@/hooks/useArticles'
 import { useSystemStats } from '@/hooks/useSystemStats'
@@ -48,7 +51,8 @@ import {
   Target,
   Brain,
   Layout,
-  Menu
+  Menu,
+  Send
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -136,20 +140,20 @@ export default function Dashboard() {
     <div className={`min-h-screen transition-all duration-700 ${
       isDarkMode 
         ? 'bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950' 
-        : 'bg-gradient-to-br from-indigo-50 via-white to-cyan-50'
+        : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'
     }`}>
       {/* Animated background pattern */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute top-20 left-20 w-72 h-72 rounded-full ${isDarkMode ? 'bg-blue-500/5' : 'bg-blue-500/10'} blur-3xl animate-pulse`}></div>
-        <div className={`absolute bottom-20 right-20 w-96 h-96 rounded-full ${isDarkMode ? 'bg-purple-500/5' : 'bg-purple-500/10'} blur-3xl animate-pulse delay-1000`}></div>
-        <div className={`absolute top-1/2 left-1/2 w-64 h-64 rounded-full ${isDarkMode ? 'bg-cyan-500/5' : 'bg-cyan-500/10'} blur-3xl animate-pulse delay-500`}></div>
+        <div className={`absolute top-20 left-20 w-72 h-72 rounded-full ${isDarkMode ? 'bg-blue-500/5' : 'bg-blue-500/8'} blur-3xl animate-pulse`}></div>
+        <div className={`absolute bottom-20 right-20 w-96 h-96 rounded-full ${isDarkMode ? 'bg-purple-500/5' : 'bg-purple-500/8'} blur-3xl animate-pulse delay-1000`}></div>
+        <div className={`absolute top-1/2 left-1/2 w-64 h-64 rounded-full ${isDarkMode ? 'bg-cyan-500/5' : 'bg-cyan-500/8'} blur-3xl animate-pulse delay-500`}></div>
       </div>
 
       {/* Modern Navbar */}
       <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${
         isDarkMode 
           ? 'bg-gray-900/80 border-gray-800/50' 
-          : 'bg-white/80 border-gray-200/50'
+          : 'bg-white/90 border-gray-300/30 shadow-lg'
       } backdrop-blur-2xl border-b`}>
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -406,67 +410,100 @@ export default function Dashboard() {
           {/* Enhanced Tabs */}
           <Tabs defaultValue="topics" className="space-y-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <TabsList className={`grid grid-cols-2 sm:grid-cols-4 p-2 rounded-3xl w-full lg:w-auto ${
+              <TabsList className={`grid grid-cols-3 sm:grid-cols-7 p-2 rounded-3xl w-full lg:w-auto ${
                 isDarkMode 
                   ? 'bg-gray-800/50 border border-gray-700/50' 
-                  : 'bg-white/50 border border-gray-200/50'
-              } backdrop-blur-xl shadow-2xl`}>
+                  : 'bg-white/80 border border-gray-300/50 shadow-lg'
+              } backdrop-blur-xl`}>
                 <TabsTrigger 
                   value="topics" 
-                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white'
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white hover:bg-gray-100'
                   }`}
                 >
-                  <Globe className="h-4 w-4" />
-                  <span className="hidden sm:inline">Topics</span>
+                  <Globe className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Topics</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="articles" 
-                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white'
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white hover:bg-gray-100'
                   }`}
                 >
-                  <FileText className="h-4 w-4" />
-                  <span className="hidden sm:inline">Articles</span>
+                  <FileText className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Articles</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="generate" 
-                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white'
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white hover:bg-gray-100'
                   }`}
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="hidden sm:inline">Generate</span>
+                  <Sparkles className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Generate</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="market" 
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-blue-600 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-blue-600 data-[state=active]:text-white hover:bg-gray-100'
+                  }`}
+                >
+                  <Activity className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Market</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="tenant" 
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white hover:bg-gray-100'
+                  }`}
+                >
+                  <Layers className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Tenant</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="distribution" 
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
+                    isDarkMode 
+                      ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white' 
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white hover:bg-gray-100'
+                  }`}
+                >
+                  <Send className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Dist</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="settings" 
-                  className={`flex items-center gap-2 rounded-2xl px-3 sm:px-6 py-3 font-semibold transition-all duration-300 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 rounded-2xl px-2 sm:px-4 py-3 font-semibold transition-all duration-300 min-h-[44px] ${
                     isDarkMode 
                       ? 'text-gray-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white' 
-                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-400 data-[state=active]:to-gray-500 data-[state=active]:text-white'
+                      : 'text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-600 data-[state=active]:to-gray-700 data-[state=active]:text-white hover:bg-gray-100'
                   }`}
                 >
-                  <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">Settings</span>
+                  <Settings className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Settings</span>
                 </TabsTrigger>
               </TabsList>
 
               {/* Quick Actions */}
               <div className="hidden lg:flex gap-2">
                 <Button variant="outline" size="sm" className={`rounded-xl ${
-                  isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-400 text-gray-600 hover:bg-gray-100 hover:border-gray-500'
                 }`}>
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
                 </Button>
                 <Button variant="outline" size="sm" className={`rounded-xl ${
-                  isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-400 text-gray-600 hover:bg-gray-100 hover:border-gray-500'
                 }`}>
                   <SortAsc className="h-4 w-4 mr-2" />
                   Sort
@@ -478,10 +515,10 @@ export default function Dashboard() {
             <TabsContent value="topics" className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                  <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} tracking-tight`}>
                     Real-time Topic Intelligence
                   </h2>
-                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 text-lg font-medium`}>
+                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-700'} mt-2 text-lg font-medium`}>
                     AI-curated high-impact topics with live monitoring
                   </p>
                 </div>
@@ -496,7 +533,7 @@ export default function Dashboard() {
               <div className={`rounded-3xl p-4 sm:p-8 ${
                 isDarkMode 
                   ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
-                  : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
+                  : 'bg-gradient-to-br from-white/70 to-blue-50/50 border border-gray-300/40'
               } backdrop-blur-xl shadow-2xl`}>
                 <TopicList
                   topics={topics.filter(topic => 
@@ -521,10 +558,10 @@ export default function Dashboard() {
             {/* Article Management */}
             <TabsContent value="articles" className="space-y-6">
               <div>
-                <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} tracking-tight`}>
                   Content Management Hub
                 </h2>
-                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 text-lg font-medium`}>
+                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-700'} mt-2 text-lg font-medium`}>
                   Manage, edit, and publish your AI-generated content
                 </p>
               </div>
@@ -532,7 +569,7 @@ export default function Dashboard() {
               <div className={`rounded-3xl p-4 sm:p-8 ${
                 isDarkMode 
                   ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
-                  : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
+                  : 'bg-gradient-to-br from-white/70 to-blue-50/50 border border-gray-300/40'
               } backdrop-blur-xl shadow-2xl`}>
                 <ArticleList
                   articles={articles}
@@ -544,10 +581,10 @@ export default function Dashboard() {
             {/* AI Generation Studio */}
             <TabsContent value="generate" className="space-y-6">
               <div>
-                <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>
+                <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} tracking-tight`}>
                   AI Generation Studio
                 </h2>
-                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 text-lg font-medium`}>
+                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-700'} mt-2 text-lg font-medium`}>
                   Advanced AI configuration for optimal content creation
                 </p>
               </div>
@@ -555,13 +592,28 @@ export default function Dashboard() {
               <div className={`rounded-3xl p-4 sm:p-8 ${
                 isDarkMode 
                   ? 'bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/30' 
-                  : 'bg-gradient-to-br from-white/40 to-gray-50/40 border border-gray-200/30'
+                  : 'bg-gradient-to-br from-white/70 to-blue-50/50 border border-gray-300/40'
               } backdrop-blur-xl shadow-2xl`}>
                 <ArticleGenerationForm 
                   topics={topics}
                   onGenerate={generateArticle}
                 />
               </div>
+            </TabsContent>
+
+            {/* Market Analysis */}
+            <TabsContent value="market" className="space-y-6">
+              <MarketDashboard />
+            </TabsContent>
+
+            {/* Tenant Management */}
+            <TabsContent value="tenant" className="space-y-6">
+              <TenantDashboard />
+            </TabsContent>
+
+            {/* Content Distribution */}
+            <TabsContent value="distribution" className="space-y-6">
+              <ContentDistributionDashboard />
             </TabsContent>
 
             {/* Settings */}

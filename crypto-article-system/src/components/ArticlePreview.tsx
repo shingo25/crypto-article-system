@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Edit, Eye, Trash2, Download, Send } from "lucide-react"
+import DOMPurify from 'dompurify'
 
 interface Article {
   id: string
@@ -331,13 +332,13 @@ export default function ArticlePreview({
                         </span>
                       </div>
                       
-                      <h3 className="text-white font-medium">{article.title}</h3>
+                      <h3 className="text-white font-medium">{DOMPurify.sanitize(article.title, { ALLOWED_TAGS: [] })}</h3>
                       
                       <div className="flex items-center gap-4 text-sm text-slate-400">
                         <div className="flex gap-2">
                           {article.coins.map((coin) => (
                             <Badge key={coin} variant="outline" className="border-yellow-600 text-yellow-600">
-                              {coin}
+                              {DOMPurify.sanitize(coin, { ALLOWED_TAGS: [] })}
                             </Badge>
                           ))}
                         </div>
@@ -426,7 +427,7 @@ export default function ArticlePreview({
               <div className="space-y-4">
                 <div className="border-b border-slate-600 pb-4">
                   <h2 className="text-xl font-bold text-white mb-2">
-                    {selectedArticle.title}
+                    {DOMPurify.sanitize(selectedArticle.title, { ALLOWED_TAGS: [] })}
                   </h2>
                   <div className="flex items-center gap-2">
                     <Badge className={getStatusColor(selectedArticle.status)}>
@@ -445,11 +446,16 @@ export default function ArticlePreview({
                   {previewMode === 'html' ? (
                     <div 
                       className="prose prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{ __html: selectedArticle.htmlContent || '' }}
+                      dangerouslySetInnerHTML={{ 
+                        __html: DOMPurify.sanitize(selectedArticle.htmlContent || '', {
+                          ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'a'],
+                          ALLOWED_ATTR: ['href', 'title']
+                        })
+                      }}
                     />
                   ) : (
                     <div className="text-slate-300 whitespace-pre-wrap">
-                      {selectedArticle.content || 'コンテンツを読み込み中...'}
+                      {DOMPurify.sanitize(selectedArticle.content || 'コンテンツを読み込み中...', { ALLOWED_TAGS: [] })}
                     </div>
                   )}
                 </div>

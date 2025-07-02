@@ -9,7 +9,18 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { apiClient } from '@/lib/api'
+import { createComponentLogger } from '@/lib/simple-logger'
 import AIModelSettings from './AIModelSettings'
+import RSSSourceManager from './RSSSourceManager'
+import LogViewer from './LogViewer'
+import SystemMonitoring from './SystemMonitoring'
+import ArticleVersionManager from './ArticleVersionManager'
+import SecureConfigManager from './SecureConfigManager'
+import PerformanceMonitor from './PerformanceMonitor'
+import QueueDashboard from './QueueDashboard'
+import WorkflowDashboard from './WorkflowDashboard'
+
+const componentLogger = createComponentLogger('SettingsPage')
 
 interface APIConfig {
   openai_api_key: string
@@ -63,21 +74,29 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
   }, [])
 
   const loadConfig = async () => {
+    const startTime = Date.now()
     try {
+      componentLogger.info('設定の読み込みを開始')
       const response = await apiClient.getAPIConfig()
       setConfig(response.config)
+      componentLogger.performance('設定読み込み', Date.now() - startTime)
     } catch (error) {
-      console.error('Failed to load config:', error)
+      componentLogger.error('設定の読み込みに失敗', error as Error, {
+        duration: Date.now() - startTime
+      })
       setMessage({ type: 'error', text: '設定の読み込みに失敗しました' })
     }
   }
 
   // 設定を保存
   const saveConfig = async () => {
+    const startTime = Date.now()
     setLoading(true)
     setMessage(null)
 
     try {
+      componentLogger.info('設定の保存を開始')
+      
       // 空でない値のみを送信
       const updates: Partial<APIConfig> = {}
       Object.entries(config).forEach(([key, value]) => {
@@ -89,17 +108,25 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
         }
       })
 
+      componentLogger.debug('更新設定データ', { updates: Object.keys(updates) })
       const response = await apiClient.updateAPIConfig(updates)
       
       if (response.success) {
+        componentLogger.business('設定保存成功', {
+          updatedFields: Object.keys(updates),
+          duration: Date.now() - startTime
+        })
         setMessage({ type: 'success', text: response.message })
         // 設定を再読み込み
         await loadConfig()
       } else {
+        componentLogger.warn('設定保存失敗', { response })
         setMessage({ type: 'error', text: '設定の保存に失敗しました' })
       }
     } catch (error) {
-      console.error('Failed to save config:', error)
+      componentLogger.error('設定の保存でエラー発生', error as Error, {
+        duration: Date.now() - startTime
+      })
       setMessage({ type: 'error', text: '設定の保存に失敗しました' })
     } finally {
       setLoading(false)
@@ -108,12 +135,20 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
 
   // 接続テスト
   const testConnections = async () => {
+    const startTime = Date.now()
     setTestingConnections(true)
     try {
+      componentLogger.info('API接続テストを開始')
       const response = await apiClient.testAPIConnections()
       setConnectionStatus(response.results)
+      componentLogger.business('API接続テスト完了', {
+        results: Object.keys(response.results),
+        duration: Date.now() - startTime
+      })
     } catch (error) {
-      console.error('Failed to test connections:', error)
+      componentLogger.error('API接続テストに失敗', error as Error, {
+        duration: Date.now() - startTime
+      })
       setMessage({ type: 'error', text: '接続テストに失敗しました' })
     } finally {
       setTestingConnections(false)
@@ -191,7 +226,7 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
         )}
 
         <Tabs defaultValue="ai-models" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-600">
+          <TabsList className="grid w-full grid-cols-12 bg-slate-800 border-slate-600">
             <TabsTrigger 
               value="ai-models"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -205,6 +240,12 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
               🔑 API設定
             </TabsTrigger>
             <TabsTrigger 
+              value="rss-sources"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📡 RSS管理
+            </TabsTrigger>
+            <TabsTrigger 
               value="wordpress"
               className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
             >
@@ -216,6 +257,48 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
             >
               ⚙️ システム設定
             </TabsTrigger>
+            <TabsTrigger 
+              value="logs"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📋 ログ監視
+            </TabsTrigger>
+            <TabsTrigger 
+              value="monitoring"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📊 システム監視
+            </TabsTrigger>
+            <TabsTrigger 
+              value="versions"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📚 バージョン管理
+            </TabsTrigger>
+            <TabsTrigger 
+              value="performance"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              📈 パフォーマンス
+            </TabsTrigger>
+            <TabsTrigger 
+              value="security"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🔒 セキュリティ
+            </TabsTrigger>
+            <TabsTrigger 
+              value="queue"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              🚀 キュー管理
+            </TabsTrigger>
+            <TabsTrigger 
+              value="workflow"
+              className="text-slate-300 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+            >
+              ✅ 承認フロー
+            </TabsTrigger>
           </TabsList>
 
           {/* AI設定タブ */}
@@ -226,6 +309,11 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
                 setMessage({ type: 'success', text: 'AI設定を保存しました' })
               }}
             />
+          </TabsContent>
+
+          {/* RSSソース管理タブ */}
+          <TabsContent value="rss-sources" className="space-y-4">
+            <RSSSourceManager />
           </TabsContent>
 
           {/* API設定タブ */}
@@ -472,6 +560,41 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* ログ監視タブ */}
+          <TabsContent value="logs" className="space-y-4">
+            <LogViewer />
+          </TabsContent>
+
+          {/* システム監視タブ */}
+          <TabsContent value="monitoring" className="space-y-4">
+            <SystemMonitoring />
+          </TabsContent>
+
+          {/* バージョン管理タブ */}
+          <TabsContent value="versions" className="space-y-4">
+            <ArticleVersionManager />
+          </TabsContent>
+
+          {/* パフォーマンス監視タブ */}
+          <TabsContent value="performance" className="space-y-4">
+            <PerformanceMonitor />
+          </TabsContent>
+
+          {/* セキュリティ設定タブ */}
+          <TabsContent value="security" className="space-y-4">
+            <SecureConfigManager />
+          </TabsContent>
+
+          {/* キュー管理タブ */}
+          <TabsContent value="queue" className="space-y-4">
+            <QueueDashboard />
+          </TabsContent>
+
+          {/* ワークフロー管理タブ */}
+          <TabsContent value="workflow" className="space-y-4">
+            <WorkflowDashboard />
           </TabsContent>
         </Tabs>
       </div>

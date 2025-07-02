@@ -8,6 +8,7 @@ import { useArticles } from '@/hooks/useArticles'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { ArticleEditor } from './ArticleEditor'
 import { FileText, Eye, Trash2, Upload, Edit3, Clock, ExternalLink } from 'lucide-react'
+import DOMPurify from 'dompurify'
 
 interface Article {
   id: string
@@ -103,16 +104,16 @@ const ArticleCard = React.memo(({
       <CardContent className="space-y-4">
         <div>
           <h3 className="text-white font-medium mb-2 line-clamp-2 leading-relaxed">
-            {article.title}
+            {DOMPurify.sanitize(article.title, { ALLOWED_TAGS: [] })}
           </h3>
           
           <div className="flex flex-wrap gap-1 mb-3">
             <Badge variant="outline" className="text-xs border-purple-400 text-purple-400">
-              {article.type}
+              {DOMPurify.sanitize(article.type, { ALLOWED_TAGS: [] })}
             </Badge>
             {article.coins.map(coin => (
               <Badge key={coin} variant="outline" className="text-xs border-blue-400 text-blue-400">
-                {coin}
+                {DOMPurify.sanitize(coin, { ALLOWED_TAGS: [] })}
               </Badge>
             ))}
           </div>
@@ -122,18 +123,18 @@ const ArticleCard = React.memo(({
             <div className="flex items-center gap-2 mt-2">
               {article.sourceUrl ? (
                 <a 
-                  href={article.sourceUrl} 
+                  href={DOMPurify.sanitize(article.sourceUrl, { ALLOWED_TAGS: [] })} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-400 transition-colors"
                 >
                   <ExternalLink className="h-3 w-3" />
-                  引用元: {article.source}
+                  引用元: {DOMPurify.sanitize(article.source, { ALLOWED_TAGS: [] })}
                 </a>
               ) : (
                 <span className="flex items-center gap-1 text-xs text-gray-400">
                   <ExternalLink className="h-3 w-3" />
-                  引用元: {article.source}
+                  引用元: {DOMPurify.sanitize(article.source, { ALLOWED_TAGS: [] })}
                 </span>
               )}
             </div>

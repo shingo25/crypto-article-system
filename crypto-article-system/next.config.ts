@@ -12,9 +12,9 @@ const nextConfig: NextConfig = {
     ],
     formats: ['image/webp', 'image/avif'],
   },
-  experimental: {
-    optimizePackageImports: ['react-hot-toast', '@tanstack/react-query']
-  }
+  // experimental: {
+  //   optimizePackageImports: ['react-hot-toast', '@tanstack/react-query']
+  // }
 };
 
 export default nextConfig;

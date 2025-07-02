@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { useArticles } from '@/hooks/useArticles'
 import { apiClient } from '@/lib/api'
 import toast from 'react-hot-toast'
+import DOMPurify from 'dompurify'
 import { 
   Edit3, 
   Save, 
@@ -160,11 +161,16 @@ export function ArticleEditor({
   }
 
   const highlightFactCheckItems = (text: string, items: FactCheckResult['items']) => {
-    if (!items || items.length === 0) return text
+    if (!items || items.length === 0) return DOMPurify.sanitize(text)
     
-    let highlightedText = text
+    // 最初にテキスト全体をサニタイズ
+    let highlightedText = DOMPurify.sanitize(text)
+    
     items.forEach((item, index) => {
-      if (item.text && text.includes(item.text)) {
+      if (item.text && highlightedText.includes(item.text)) {
+        // 各項目もサニタイズ
+        const safeText = DOMPurify.sanitize(item.text, { ALLOWED_TAGS: [] })
+        const safeMessage = DOMPurify.sanitize(item.message || '', { ALLOWED_TAGS: [] })
         const className = item.verified === true 
           ? 'bg-green-200/20 border-b-2 border-green-400 text-green-300'
           : item.verified === false 
@@ -172,12 +178,17 @@ export function ArticleEditor({
           : 'bg-yellow-200/20 border-b-2 border-yellow-400 text-yellow-300'
         
         highlightedText = highlightedText.replace(
-          item.text,
-          `<span class="${className}" title="${item.message || ''}">${item.text}</span>`
+          safeText,
+          `<span class="${className}" title="${safeMessage}">${safeText}</span>`
         )
       }
     })
-    return highlightedText
+    
+    // 最終的にもう一度サニタイズ
+    return DOMPurify.sanitize(highlightedText, {
+      ALLOWED_TAGS: ['span'],
+      ALLOWED_ATTR: ['class', 'title']
+    })
   }
 
   return (
@@ -320,7 +331,12 @@ export function ArticleEditor({
                 <div dangerouslySetInnerHTML={{ 
                   __html: factCheckResults && showFactCheck 
                     ? highlightFactCheckItems(content.replace(/\n/g, '<br>'), factCheckResults.items)
-                    : content.replace(/\n/g, '<br>')
+                    : DOMPurify.sanitize(content.replace(/\n/g, '<br>'), {
+                        ALLOWED_TAGS: ['br', 'p', 'strong', 'em', 'b', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote'],
+                        ALLOWED_ATTR: [],
+                        KEEP_CONTENT: false,
+                        ALLOW_DATA_ATTR: false
+                      })
                 }} />
               </div>
               
@@ -376,8 +392,8 @@ export function ArticleEditor({
                           )}
                         </div>
                         <div>
-                          <div className="text-white font-medium">{item.text}</div>
-                          {item.message && <div className="text-gray-400 mt-1">{item.message}</div>}
+                          <div className="text-white font-medium">{DOMPurify.sanitize(item.text, { ALLOWED_TAGS: [] })}</div>
+                          {item.message && <div className="text-gray-400 mt-1">{DOMPurify.sanitize(item.message, { ALLOWED_TAGS: [] })}</div>}
                         </div>
                       </div>
                     ))}

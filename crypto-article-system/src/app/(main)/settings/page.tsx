@@ -3,9 +3,10 @@
 import React, { useState } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Settings, Brain, Globe, Palette, Shield } from 'lucide-react'
+import { Settings, Brain, Globe, Palette, Shield, Rss } from 'lucide-react'
 import AIModelSettings from '@/components/AIModelSettings'
 import WordPressSettings from '@/components/WordPressSettings'
+import RSSSourceManager from '@/components/RSSSourceManager'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('ai-models')
@@ -30,7 +31,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 neural-neumorphic">
+            <TabsList className="grid w-full grid-cols-5 neural-neumorphic">
               <TabsTrigger 
                 value="ai-models" 
                 className="flex items-center gap-2 data-[state=active]:bg-neural-elevated/20 data-[state=active]:text-neural-cyan"
@@ -44,6 +45,13 @@ export default function SettingsPage() {
               >
                 <Globe className="h-4 w-4" />
                 WordPress
+              </TabsTrigger>
+              <TabsTrigger 
+                value="rss" 
+                className="flex items-center gap-2 data-[state=active]:bg-neural-elevated/20 data-[state=active]:text-neural-cyan"
+              >
+                <Rss className="h-4 w-4" />
+                RSS Sources
               </TabsTrigger>
               <TabsTrigger 
                 value="appearance" 
@@ -70,6 +78,12 @@ export default function SettingsPage() {
             <TabsContent value="wordpress" className="mt-6">
               <div className="neural-neumorphic-inset rounded-lg p-6">
                 <WordPressSettings />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="rss" className="mt-6">
+              <div className="neural-neumorphic-inset rounded-lg p-6">
+                <RSSSourceManager />
               </div>
             </TabsContent>
 

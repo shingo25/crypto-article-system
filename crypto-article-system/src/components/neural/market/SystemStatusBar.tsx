@@ -126,33 +126,55 @@ export function SystemStatusBar() {
   }
 
   return (
-    <div className="neural-neumorphic-inset rounded-lg">
+    <div className="neural-card border border-neural-elevated/30">
       {/* コンパクトビュー */}
-      <div className="flex items-center justify-between p-3">
-        <div className="flex items-center gap-3">
-          {getStatusIcon(status.overall)}
-          <span className="text-sm font-medium neural-title">
-            System Status
-          </span>
-          <Badge className={cn("text-xs border-0", getStatusColor(status.overall))}>
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {getStatusIcon(status.overall)}
+            <span className="text-sm font-semibold neural-title">
+              System Status
+            </span>
+          </div>
+          
+          <Badge className={cn("text-xs font-medium px-2 py-1", getStatusColor(status.overall))}>
             {status.overall.toUpperCase()}
           </Badge>
+          
+          {/* 主要メトリクス（デスクトップのみ） */}
+          <div className="hidden md:flex items-center gap-4 text-xs text-neural-text-muted">
+            <div className="flex items-center gap-1">
+              <Server className="h-3 w-3" />
+              <span>API: {status.api.responseTime}ms</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Database className="h-3 w-3" />
+              <span>DB: {status.database.connections} conns</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <HardDrive className="h-3 w-3" />
+              <span>CPU: {status.system.cpu}%</span>
+            </div>
+          </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-neural-text-muted">
-            <span>{new Date(status.lastCheck).toLocaleTimeString('ja-JP')}</span>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-neural-text-muted">
+            Last: {new Date(status.lastCheck).toLocaleTimeString('ja-JP', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
           </div>
           
           <NeuralButton
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-6 w-6 p-0"
+            className="h-7 w-7 p-0"
           >
             {isExpanded ? 
-              <ChevronUp className="h-3 w-3" /> : 
-              <ChevronDown className="h-3 w-3" />
+              <ChevronUp className="h-4 w-4" /> : 
+              <ChevronDown className="h-4 w-4" />
             }
           </NeuralButton>
         </div>

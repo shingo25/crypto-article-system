@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { apiClient } from '@/lib/api'
 import toast from 'react-hot-toast'
+import { useOptionalAuth } from '@/components/auth/AuthProvider'
+import { requireAuthForRSSSource } from '@/lib/auth-helpers'
 import {
   Rss,
   Plus,
@@ -45,6 +47,7 @@ interface NewSource {
 }
 
 export default function RSSSourceManager() {
+  const { isAuthenticated } = useOptionalAuth()
   const [sources, setSources] = useState<RSSSource[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -61,20 +64,26 @@ export default function RSSSourceManager() {
   const loadSources = async () => {
     try {
       setLoading(true)
-      const response = await apiClient.getSources()
-      // APIレスポンスの形式に合わせて変換
-      const transformedSources = response.sources?.map(source => ({
-        id: source.id,
-        name: source.name,
-        url: source.url,
-        category: source.type || 'news',
-        enabled: source.active,
-        lastCollected: source.lastUpdate,
-        totalCollected: source.itemsCollected || 0,
-        status: source.active ? 'active' : 'inactive' as 'active' | 'error' | 'inactive',
-        description: source.description
-      })) || []
-      setSources(transformedSources)
+      const response = await fetch('/api/sources')
+      const data = await response.json()
+      
+      if (data.success) {
+        // APIレスポンスの形式に合わせて変換
+        const transformedSources = data.sources?.map(source => ({
+          id: source.id,
+          name: source.name,
+          url: source.url,
+          category: source.type || 'news',
+          enabled: source.active,
+          lastCollected: source.lastUpdate,
+          totalCollected: source.itemsCollected || 0,
+          status: source.status || (source.active ? 'active' : 'inactive') as 'active' | 'error' | 'inactive',
+          description: source.description
+        })) || []
+        setSources(transformedSources)
+      } else {
+        throw new Error(data.error || 'Failed to fetch sources')
+      }
     } catch (error) {
       console.error('Failed to load RSS sources:', error)
       toast.error('RSSソースの読み込みに失敗しました')
@@ -89,14 +98,22 @@ export default function RSSSourceManager() {
 
   // 新しいソースを追加
   const addSource = async () => {
+    // 認証チェック
+    if (!requireAuthForRSSSource(isAuthenticated)) {
+      return
+    }
+
     if (!newSource.name || !newSource.url) {
       toast.error('名前とURLは必須です')
       return
     }
 
     try {
-      const response = await apiClient.request('/api/sources', {
+      const response = await fetch('/api/sources', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           name: newSource.name,
           url: newSource.url,
@@ -105,13 +122,15 @@ export default function RSSSourceManager() {
         })
       })
       
-      if (response.success) {
+      const data = await response.json()
+      
+      if (data.success) {
         toast.success('RSSソースを追加しました')
         setNewSource({ name: '', url: '', category: 'news', description: '' })
         setShowAddForm(false)
         await loadSources()
       } else {
-        toast.error('RSSソースの追加に失敗しました')
+        toast.error(data.error || 'RSSソースの追加に失敗しました')
       }
     } catch (error) {
       console.error('Failed to add RSS source:', error)
@@ -121,18 +140,25 @@ export default function RSSSourceManager() {
 
   // ソースを削除
   const deleteSource = async (id: string) => {
+    // 認証チェック
+    if (!requireAuthForRSSSource(isAuthenticated)) {
+      return
+    }
+
     if (!confirm('このRSSソースを削除しますか？')) return
 
     try {
-      const response = await apiClient.request(`/api/sources/${id}`, {
+      const response = await fetch(`/api/sources/${id}`, {
         method: 'DELETE'
       })
       
-      if (response.success) {
+      const data = await response.json()
+      
+      if (data.success) {
         toast.success('RSSソースを削除しました')
         await loadSources()
       } else {
-        toast.error('RSSソースの削除に失敗しました')
+        toast.error(data.error || 'RSSソースの削除に失敗しました')
       }
     } catch (error) {
       console.error('Failed to delete RSS source:', error)
@@ -142,17 +168,27 @@ export default function RSSSourceManager() {
 
   // ソースの有効/無効を切り替え
   const toggleSource = async (id: string, enabled: boolean) => {
+    // 認証チェック
+    if (!requireAuthForRSSSource(isAuthenticated)) {
+      return
+    }
+
     try {
-      const response = await apiClient.request(`/api/sources/${id}`, {
+      const response = await fetch(`/api/sources/${id}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ active: enabled })
       })
       
-      if (response.success) {
+      const data = await response.json()
+      
+      if (data.success) {
         toast.success(`RSSソースを${enabled ? '有効' : '無効'}にしました`)
         await loadSources()
       } else {
-        toast.error('RSSソースの更新に失敗しました')
+        toast.error(data.error || 'RSSソースの更新に失敗しました')
       }
     } catch (error) {
       console.error('Failed to toggle RSS source:', error)
@@ -166,15 +202,20 @@ export default function RSSSourceManager() {
 
     try {
       setTestingUrl(url)
-      const response = await apiClient.request('/api/sources/test', {
+      const response = await fetch('/api/sources/test', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ url })
       })
       
-      if (response.valid) {
+      const data = await response.json()
+      
+      if (data.success && data.valid) {
         toast.success('URLは有効です')
       } else {
-        toast.error('URLが無効です: ' + (response.error || '不明なエラー'))
+        toast.error('URLが無効です: ' + (data.error || '不明なエラー'))
       }
     } catch (error) {
       console.error('Failed to test URL:', error)
@@ -184,24 +225,26 @@ export default function RSSSourceManager() {
     }
   }
 
-  // 特定ソースからトピック収集
+  // 特定ソースからニュース収集
   const collectFromSource = async (id: string) => {
     try {
       setCollectingSource(id)
-      const response = await apiClient.request(`/api/sources/${id}/collect`, {
+      const response = await fetch(`/api/sources/${id}/collect`, {
         method: 'POST'
       })
       
-      if (response.success) {
-        toast.success('トピック収集を開始しました')
+      const data = await response.json()
+      
+      if (data.success) {
+        toast.success('ニュース収集を開始しました')
         // 少し待ってからソース一覧を更新
         setTimeout(() => loadSources(), 2000)
       } else {
-        toast.error('トピック収集の開始に失敗しました')
+        toast.error(data.error || 'ニュース収集の開始に失敗しました')
       }
     } catch (error) {
       console.error('Failed to collect from source:', error)
-      toast.error('トピック収集の開始に失敗しました')
+      toast.error('ニュース収集の開始に失敗しました')
     } finally {
       setCollectingSource(null)
     }

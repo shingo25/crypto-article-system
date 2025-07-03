@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useOptionalAuth } from '@/components/auth/AuthProvider'
+import { requireAuthForSave } from '@/lib/auth-helpers'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +27,7 @@ interface ConnectionTestResult {
 }
 
 export default function WordPressSettings() {
+  const { isAuthenticated } = useOptionalAuth()
   const [config, setConfig] = useState<WordPressConfig>({
     url: '',
     username: '',
@@ -91,6 +94,11 @@ export default function WordPressSettings() {
 
   // 設定保存
   const handleSaveConfig = async () => {
+    // 認証チェック
+    if (!requireAuthForSave(isAuthenticated)) {
+      return
+    }
+
     if (!formData.url || !formData.username || !formData.password) {
       setError('すべての項目を入力してください')
       return

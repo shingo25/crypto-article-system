@@ -465,3 +465,6 @@ export const createComponentLogger = (componentName: string) => {
       logger.performance(operation, duration, { ...context, component: componentName })
   }
 }
+
+// エイリアス for 後方互換性
+export const createLogger = createComponentLogger

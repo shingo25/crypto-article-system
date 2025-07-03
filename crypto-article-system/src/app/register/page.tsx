@@ -1,169 +1,373 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import toast from 'react-hot-toast';
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
+import { NeuralButton } from '@/components/neural/NeuralButton'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
+import { 
+  Eye, EyeOff, Lock, Mail, UserPlus, AlertCircle, 
+  Check, X, User, Shield 
+} from 'lucide-react'
+import { useAuthStore } from '@/lib/stores/authStore'
+import { cn } from '@/lib/utils'
 
 export default function RegisterPage() {
+  const router = useRouter()
+  const { register, isLoading } = useAuthStore()
+  
   const [formData, setFormData] = useState({
     email: '',
-    username: '',
     password: '',
-    firstName: '',
-    lastName: '',
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const { register } = useAuth();
-  const router = useRouter();
+    confirmPassword: '',
+    fullName: '',
+    acceptTerms: false
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [registerError, setRegisterError] = useState('')
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }))
+    
+    // エラーをクリア
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+    if (registerError) {
+      setRegisterError('')
+    }
+  }
+
+  const validatePassword = (password: string) => {
+    const requirements = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password)
+    }
+    return requirements
+  }
+
+  const passwordRequirements = validatePassword(formData.password)
+  const isPasswordValid = Object.values(passwordRequirements).every(Boolean)
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.email) {
+      newErrors.email = 'メールアドレスが必要です'
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = '有効なメールアドレスを入力してください'
+    }
+
+    if (!formData.fullName) {
+      newErrors.fullName = '名前が必要です'
+    } else if (formData.fullName.length < 2) {
+      newErrors.fullName = '名前は2文字以上で入力してください'
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'パスワードが必要です'
+    } else if (!isPasswordValid) {
+      newErrors.password = 'パスワードの要件を満たしていません'
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'パスワードの確認が必要です'
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'パスワードが一致しません'
+    }
+
+    if (!formData.acceptTerms) {
+      newErrors.acceptTerms = '利用規約に同意してください'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+    e.preventDefault()
+    setRegisterError('')
+
+    if (!validateForm()) {
+      return
+    }
 
     try {
-      const result = await register(formData);
+      await register({
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.fullName
+      })
       
-      if (result.success) {
-        toast.success('ユーザー登録が完了しました。ログインページに移動します。');
-        router.push('/login');
+      // 登録成功後にログイン画面へリダイレクト
+      router.push('/login?message=registration_success')
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        const detail = error.response?.data?.detail
+        if (detail?.includes('メールアドレス')) {
+          setRegisterError('このメールアドレスは既に登録されています')
+        } else if (detail?.includes('パスワード')) {
+          setRegisterError('パスワードの要件を満たしていません')
+        } else {
+          setRegisterError(detail || '入力内容に問題があります')
+        }
+      } else if (error.response?.status === 429) {
+        setRegisterError('登録試行回数が上限に達しました。しばらくお待ちください。')
       } else {
-        toast.error(result.error || 'ユーザー登録に失敗しました');
+        setRegisterError('登録に失敗しました。しばらくしてから再試行してください。')
       }
-    } catch (error) {
-      toast.error('ネットワークエラーが発生しました');
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  const PasswordRequirement = ({ met, text }: { met: boolean; text: string }) => (
+    <div className={cn(
+      "flex items-center gap-2 text-xs",
+      met ? "text-neural-success" : "text-neural-text-muted"
+    )}>
+      {met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+      <span>{text}</span>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neural-bg-primary via-neural-bg-secondary to-neural-bg-tertiary">
-      <Card className="w-full max-w-md p-8 bg-neural-surface/80 backdrop-blur-sm border-neural-elevated">
+    <div className="min-h-screen bg-neural-void flex items-center justify-center p-4">
+      {/* Aurora Background */}
+      <div className="neural-aurora" />
+      
+      <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-neural-text-primary mb-2">
-            新規登録
+          <h1 className="text-3xl font-bold neural-title neural-glow-text mb-2">
+            Crypto Article System
           </h1>
           <p className="text-neural-text-secondary">
-            Crypto Article Systemのアカウントを作成
+            暗号通貨記事自動生成システムに新規登録
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName" className="text-neural-text-primary">
-                名前
-              </Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                type="text"
-                value={formData.firstName}
-                onChange={handleChange}
-                className="bg-neural-bg-primary border-neural-elevated"
-                placeholder="太郎"
-              />
+        <NeuralCard>
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="flex items-center justify-center gap-2 text-xl">
+              <UserPlus className="h-5 w-5 text-neural-success" />
+              新規登録
+            </CardTitle>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            {registerError && (
+              <Alert className="border-neural-error bg-neural-error/10">
+                <AlertCircle className="h-4 w-4 text-neural-error" />
+                <AlertDescription className="text-neural-error">
+                  {registerError}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="fullName" className="text-sm font-medium neural-title">
+                  お名前
+                </Label>
+                <div className="relative mt-1">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neural-text-muted" />
+                  <Input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    className={cn(
+                      "pl-10 neural-neumorphic-inset border-0",
+                      errors.fullName && "ring-2 ring-neural-error"
+                    )}
+                    placeholder="山田 太郎"
+                  />
+                </div>
+                {errors.fullName && (
+                  <p className="text-xs text-neural-error mt-1">{errors.fullName}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium neural-title">
+                  メールアドレス
+                </Label>
+                <div className="relative mt-1">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neural-text-muted" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={cn(
+                      "pl-10 neural-neumorphic-inset border-0",
+                      errors.email && "ring-2 ring-neural-error"
+                    )}
+                    placeholder="your@email.com"
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-xs text-neural-error mt-1">{errors.email}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="password" className="text-sm font-medium neural-title">
+                  パスワード
+                </Label>
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neural-text-muted" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={cn(
+                      "pl-10 pr-10 neural-neumorphic-inset border-0",
+                      errors.password && "ring-2 ring-neural-error"
+                    )}
+                    placeholder="パスワードを入力"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neural-text-muted hover:text-neural-text-primary"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                
+                {/* パスワード要件 */}
+                {formData.password && (
+                  <div className="mt-2 p-3 bg-neural-surface rounded-lg space-y-1">
+                    <div className="text-xs font-medium text-neural-text-secondary mb-1">
+                      パスワード要件:
+                    </div>
+                    <PasswordRequirement met={passwordRequirements.length} text="8文字以上" />
+                    <PasswordRequirement met={passwordRequirements.uppercase} text="大文字を含む" />
+                    <PasswordRequirement met={passwordRequirements.lowercase} text="小文字を含む" />
+                    <PasswordRequirement met={passwordRequirements.number} text="数字を含む" />
+                  </div>
+                )}
+                
+                {errors.password && (
+                  <p className="text-xs text-neural-error mt-1">{errors.password}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="confirmPassword" className="text-sm font-medium neural-title">
+                  パスワード確認
+                </Label>
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neural-text-muted" />
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className={cn(
+                      "pl-10 pr-10 neural-neumorphic-inset border-0",
+                      errors.confirmPassword && "ring-2 ring-neural-error"
+                    )}
+                    placeholder="パスワードを再入力"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neural-text-muted hover:text-neural-text-primary"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-neural-error mt-1">{errors.confirmPassword}</p>
+                )}
+              </div>
+
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="acceptTerms"
+                  checked={formData.acceptTerms}
+                  onCheckedChange={(checked) => 
+                    setFormData(prev => ({ ...prev, acceptTerms: checked as boolean }))
+                  }
+                  className="mt-1"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label
+                    htmlFor="acceptTerms"
+                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    利用規約とプライバシーポリシーに同意します
+                  </Label>
+                </div>
+              </div>
+              {errors.acceptTerms && (
+                <p className="text-xs text-neural-error">{errors.acceptTerms}</p>
+              )}
+
+              <NeuralButton
+                type="submit"
+                className="w-full neural-gradient-success text-white border-0"
+                disabled={isLoading || !isPasswordValid}
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    登録中...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    新規登録
+                  </div>
+                )}
+              </NeuralButton>
+            </form>
+
+            <div className="text-center space-y-4">
+              <div className="text-sm text-neural-text-muted">
+                既にアカウントをお持ちの方は
+              </div>
+              
+              <Link href="/login">
+                <NeuralButton
+                  variant="outline"
+                  className="w-full neural-button"
+                >
+                  ログイン
+                </NeuralButton>
+              </Link>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName" className="text-neural-text-primary">
-                姓
-              </Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                type="text"
-                value={formData.lastName}
-                onChange={handleChange}
-                className="bg-neural-bg-primary border-neural-elevated"
-                placeholder="田中"
-              />
-            </div>
+          </CardContent>
+        </NeuralCard>
+
+        <div className="text-center mt-6 text-xs text-neural-text-muted">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Shield className="h-4 w-4" />
+            <span>セキュアな登録システム</span>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-neural-text-primary">
-              ユーザー名 *
-            </Label>
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              className="bg-neural-bg-primary border-neural-elevated"
-              placeholder="username"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-neural-text-primary">
-              メールアドレス *
-            </Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="bg-neural-bg-primary border-neural-elevated"
-              placeholder="your@email.com"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-neural-text-primary">
-              パスワード *
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              className="bg-neural-bg-primary border-neural-elevated"
-              placeholder="••••••••"
-            />
-            <p className="text-xs text-neural-text-secondary">
-              8文字以上で入力してください
-            </p>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-neural-accent hover:bg-neural-accent/90"
-          >
-            {isLoading ? '登録中...' : 'アカウント作成'}
-          </Button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-neural-text-secondary">
-            既にアカウントをお持ちですか？{' '}
-            <button
-              onClick={() => router.push('/login')}
-              className="text-neural-accent hover:underline"
-            >
-              ログイン
-            </button>
-          </p>
+          <p>すべてのデータは暗号化されて保護されます</p>
         </div>
-      </Card>
+      </div>
     </div>
-  );
+  )
 }

@@ -48,6 +48,7 @@ model User {
   // Relations
   articles  Article[]
   sessions  UserSession[]
+  alertSettings AlertSettings[]
   
   @@map("users")
 }
@@ -207,6 +208,7 @@ model NewsItem {
   content     String?
   url         String   @unique
   imageUrl    String?
+  guid        String   @unique // RSS GUID for deduplication
   
   // Source information
   source      String   // e.g., "CoinDesk", "CoinTelegraph"
@@ -216,8 +218,16 @@ model NewsItem {
   sentiment   Float?   // -1 to 1 (negative to positive)
   importance  Int @default(1) // 1-10 scale
   aiSummary   String?
-  topics      Json? // extracted topics/tags
+  
+  // Structured Tags (新しいタグシステム)
+  topics      Json? // general topics
   coins       Json? // mentioned cryptocurrencies
+  companies   Json? // mentioned companies/exchanges
+  products    Json? // financial products (ETF, futures, etc.)
+  technology  Json? // blockchain/tech related
+  market      Json? // market trends/analysis
+  regulatory  Json? // regulatory/legal topics  
+  regions     Json? // geographical regions
   
   // Article generation
   hasGeneratedArticle Boolean @default(false)
@@ -229,6 +239,26 @@ model NewsItem {
   updatedAt   DateTime @updatedAt
   
   @@map("news_items")
+}
+
+model RSSSource {
+  id          String   @id @default(cuid())
+  name        String
+  url         String   @unique
+  category    String   // news, analysis, market, technology
+  description String?
+  enabled     Boolean  @default(true)
+  
+  // Collection stats
+  lastCollected DateTime?
+  totalCollected Int @default(0)
+  status      String @default("active") // active, error, inactive
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("rss_sources")
 }
 
 model PriceAlert {
@@ -269,6 +299,102 @@ model AlertTrigger {
   triggeredAt DateTime @default(now())
   
   @@map("alert_triggers")
+}
+
+// ========================================
+// Market Alert System Models
+// ========================================
+
+model PriceHistory {
+  id        Int      @id @default(autoincrement())
+  symbol    String   // e.g., "bitcoin", "ethereum"
+  name      String   // e.g., "Bitcoin", "Ethereum"
+  price     Float
+  volume    Float
+  marketCap Float?
+  rank      Int?
+  
+  // Price changes
+  change1h  Float?
+  change24h Float?
+  change7d  Float?
+  
+  // Timestamps
+  timestamp DateTime @default(now())
+  
+  @@index([symbol, timestamp])
+  @@map("price_history")
+}
+
+model AlertHistory {
+  id          Int      @id @default(autoincrement())
+  symbol      String   // Cryptocurrency symbol
+  alertType   String   // "price_change", "volume_spike", "sentiment", "market_structure"
+  level       String   // "high", "medium", "low"
+  title       String   // Alert title/message
+  description String   // Detailed description
+  
+  // Alert data
+  changePercent Float?  // Price change percentage
+  timeframe     String? // "1h", "4h", "24h"
+  volume        Float?  // Current volume
+  details       Json?   // Additional alert details
+  
+  // Metadata
+  isActive      Boolean @default(true)
+  dismissed     Boolean @default(false)
+  
+  // Timestamps
+  timestamp     DateTime @default(now())
+  
+  @@index([symbol, timestamp])
+  @@index([level, timestamp])
+  @@map("alert_history")
+}
+
+model MarketIndicators {
+  id              Int      @id @default(autoincrement())
+  
+  // Global market data
+  totalMarketCap  Float
+  btcDominance    Float
+  fearGreedIndex  Int?
+  
+  // Volume metrics
+  totalVolume24h  Float?
+  
+  // Timestamps
+  timestamp       DateTime @default(now())
+  
+  @@index([timestamp])
+  @@map("market_indicators")
+}
+
+model AlertSettings {
+  id            Int      @id @default(autoincrement())
+  userId        String?  // NULL for global settings
+  
+  // Alert configuration
+  symbol        String?  // NULL for all symbols
+  alertType     String   // Alert type identifier
+  isEnabled     Boolean  @default(true)
+  
+  // Thresholds
+  threshold     Float?   // Configurable threshold value
+  cooldownHours Int      @default(4) // Hours before re-alerting
+  
+  // Daily limits
+  maxAlertsPerDay     Int @default(5)
+  maxGlobalAlertsPerDay Int @default(50)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  user          User?    @relation(fields: [userId], references: [id])
+  
+  @@map("alert_settings")
 }
 
 // ========================================

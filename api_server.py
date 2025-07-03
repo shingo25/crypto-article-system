@@ -4,7 +4,7 @@ FastAPI backend server for the crypto article generation system
 フロントエンドとバックエンドを接続するREST APIサーバー
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -19,6 +19,9 @@ import asyncio
 from contextlib import asynccontextmanager
 from celery.result import AsyncResult
 from redis import Redis
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # 自作モジュール
 from src.article_pipeline import ArticlePipeline, PipelineConfig
@@ -33,7 +36,16 @@ from src.database import (
 )
 from celery_app import app as celery_app, generate_article_async, collect_topics_async
 from scheduler import get_scheduler, start_scheduler, stop_scheduler, get_scheduler_status
-from auth import get_api_key, is_public_endpoint, API_KEY_NAME
+
+# 認証関連モジュール
+from src.auth_models import User, APIKey
+from src.auth_service import AuthService
+from src.auth_routes import router as auth_router
+from src.auth_middleware import (
+    AuthenticationMiddleware, SecurityHeadersMiddleware, IPWhitelistMiddleware,
+    get_current_user_from_request, require_permissions, rate_limit_handler,
+    validate_jwt_config, limiter
+)
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -97,6 +109,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database initialization failed: {e}")
     
+    # JWT設定の検証
+    try:
+        validate_jwt_config()
+        logger.info("JWT configuration validated")
+    except ValueError as e:
+        logger.warning(f"JWT configuration warning: {e}")
+    
     # スケジューラーを開始
     try:
         scheduler_started = await start_scheduler()
@@ -129,6 +148,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# レート制限エラーハンドラーを追加
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+
+# セキュリティミドルウェア追加
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(IPWhitelistMiddleware)  # 管理者機能用
+app.add_middleware(AuthenticationMiddleware)
+
 # CORS設定
 app.add_middleware(
     CORSMiddleware,
@@ -139,29 +166,8 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# API認証ミドルウェア
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-
-class APIKeyMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # OPTIONSリクエストと公開エンドポイントは認証をスキップ
-        if request.method == "OPTIONS" or is_public_endpoint(request.url.path):
-            return await call_next(request)
-        
-        # APIキーの検証
-        api_key = request.headers.get(API_KEY_NAME)
-        try:
-            await get_api_key(api_key)
-            return await call_next(request)
-        except HTTPException as e:
-            return JSONResponse(
-                status_code=e.status_code,
-                content={"detail": e.detail}
-            )
-
-app.add_middleware(APIKeyMiddleware)
+# 認証ルーターを追加
+app.include_router(auth_router)
 
 # Pydantic モデル
 class SystemControlRequest(BaseModel):
@@ -215,7 +221,9 @@ async def health_check():
 
 # テンプレート関連のエンドポイント
 @app.get("/api/templates")
+@limiter.limit("30/minute")  # レート制限追加
 async def get_article_templates(
+    request: Request,
     category: Optional[str] = None,
     active_only: bool = True,
     db: Session = Depends(get_db)
@@ -315,9 +323,13 @@ async def use_template(template_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error updating template usage {template_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# システム関連のエンドポイント
+# システム関連のエンドポイント  
 @app.get("/api/system/stats")
-async def get_system_stats():
+@limiter.limit("10/minute")
+async def get_system_stats(
+    request: Request,
+    current_user: User = Depends(get_current_user_from_request)
+):
     """システムの統計情報を取得"""
     try:
         # パイプラインの統計を取得
@@ -373,10 +385,16 @@ async def get_system_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/system/control")
-async def control_system(request: SystemControlRequest, background_tasks: BackgroundTasks):
+@limiter.limit("5/minute")
+async def control_system(
+    request_data: SystemControlRequest, 
+    background_tasks: BackgroundTasks,
+    request: Request,
+    current_user: User = Depends(get_current_user_from_request)
+):
     """システムの開始・停止・再起動"""
     try:
-        if request.action == "start":
+        if request_data.action == "start":
             # パイプライン開始
             if pipeline:
                 background_tasks.add_task(run_pipeline_once)
@@ -390,7 +408,7 @@ async def control_system(request: SystemControlRequest, background_tasks: Backgr
                 "message": f"システムを開始しました (スケジューラー: {'成功' if scheduler_started else '失敗'})"
             }
         
-        elif request.action == "stop":
+        elif request_data.action == "stop":
             # スケジューラー停止
             scheduler_stopped = await stop_scheduler()
             
@@ -400,7 +418,7 @@ async def control_system(request: SystemControlRequest, background_tasks: Backgr
                 "message": f"システムを停止しました (スケジューラー: {'成功' if scheduler_stopped else '失敗'})"
             }
         
-        elif request.action == "restart":
+        elif request_data.action == "restart":
             # スケジューラー再起動
             from scheduler import restart_scheduler
             scheduler_restarted = await restart_scheduler()

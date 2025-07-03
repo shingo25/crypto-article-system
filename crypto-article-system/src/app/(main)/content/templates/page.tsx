@@ -1,5 +1,8 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import React, { useState, useMemo, useCallback } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { NeuralButton } from '@/components/neural/NeuralButton'
@@ -148,6 +151,37 @@ export default function TemplatesManagementPage() {
     })
   }
 
+  const handleAction = useCallback((action: string, template: Template) => {
+    switch (action) {
+      case 'view':
+        setSelectedTemplate(template)
+        break
+      case 'edit':
+        router.push(`/content/templates/${template.id}/edit`)
+        break
+      case 'use':
+        const params = new URLSearchParams({
+          template: template.id,
+          source: 'template'
+        })
+        router.push(`/content/workspace?${params.toString()}`)
+        toast.success(`テンプレート「${template.name}」で記事生成を開始します`)
+        break
+      case 'copy':
+        navigator.clipboard.writeText(template.content)
+        toast.success('テンプレートをクリップボードにコピーしました')
+        break
+      case 'toggle':
+        toast.success(`テンプレートを${template.isActive ? '無効' : '有効'}にしました`)
+        break
+      case 'delete':
+        toast.success('テンプレートを削除しました')
+        break
+      default:
+        toast.info(`${action} 機能は準備中です`)
+    }
+  }, [router])
+
   const columns = useMemo(() => [
     columnHelper.accessor('name', {
       header: ({ column }) => (
@@ -286,37 +320,6 @@ export default function TemplatesManagementPage() {
       },
     },
   })
-
-  const handleAction = useCallback((action: string, template: Template) => {
-    switch (action) {
-      case 'view':
-        setSelectedTemplate(template)
-        break
-      case 'edit':
-        router.push(`/content/templates/${template.id}/edit`)
-        break
-      case 'use':
-        const params = new URLSearchParams({
-          template: template.id,
-          source: 'template'
-        })
-        router.push(`/content/workspace?${params.toString()}`)
-        toast.success(`テンプレート「${template.name}」で記事生成を開始します`)
-        break
-      case 'copy':
-        navigator.clipboard.writeText(template.content)
-        toast.success('テンプレートをクリップボードにコピーしました')
-        break
-      case 'toggle':
-        toast.success(`テンプレートを${template.isActive ? '無効' : '有効'}にしました`)
-        break
-      case 'delete':
-        toast.success('テンプレートを削除しました')
-        break
-      default:
-        toast.info(`${action} 機能は準備中です`)
-    }
-  }, [router])
 
   const handleCreateTemplate = () => {
     toast.info('新規テンプレート作成機能は準備中です')

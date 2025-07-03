@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth-context'
+import { useOptionalAuth } from '@/components/auth/AuthProvider'
 import { 
   BarChart3, 
   FileText, 
@@ -82,7 +82,7 @@ interface NeuralLayoutProps {
 export function NeuralLayout({ children, currentPath }: NeuralLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout, isLoading } = useAuth()
+  const { user, logout, isLoading } = useOptionalAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
@@ -195,7 +195,13 @@ export function NeuralLayout({ children, currentPath }: NeuralLayoutProps) {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-2">
+                {!isCollapsed && (
+                  <div className="px-2 py-1 text-xs text-neural-text-secondary">
+                    ゲストユーザー
+                    <div className="text-neural-text-muted">保存機能は制限されています</div>
+                  </div>
+                )}
                 <Link href="/login">
                   <Button
                     variant="ghost"

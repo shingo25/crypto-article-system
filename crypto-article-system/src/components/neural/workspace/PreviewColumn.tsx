@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
+import { NeuralButton } from '@/components/neural/NeuralButton'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { 
@@ -37,19 +37,16 @@ const PreviewModeToggle: React.FC = () => {
   return (
     <div className="flex items-center gap-1 p-1 bg-neural-surface rounded-lg">
       {modes.map(({ key, label, icon: Icon }) => (
-        <Button
+        <NeuralButton
           key={key}
-          variant="ghost"
+          variant={previewMode === key ? "gradient" : "ghost"}
           size="sm"
-          className={cn(
-            "neural-button text-xs h-8 px-3",
-            previewMode === key && "neural-gradient-primary text-white"
-          )}
+          className="text-xs h-8 px-3"
           onClick={() => setPreviewMode(key)}
         >
           <Icon className="h-3 w-3 mr-1" />
           {label}
-        </Button>
+        </NeuralButton>
       ))}
     </div>
   )
@@ -63,7 +60,7 @@ const ArticleMetadata: React.FC = () => {
   const { metadata } = currentArticle
 
   return (
-    <Card className="neural-neumorphic border-0 mb-4">
+    <NeuralCard className="mb-4">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold neural-title flex items-center gap-2">
           <FileText className="h-4 w-4" />
@@ -109,7 +106,7 @@ const ArticleMetadata: React.FC = () => {
           Updated {new Date(metadata.updatedAt).toLocaleString('ja-JP')}
         </div>
       </CardContent>
-    </Card>
+    </NeuralCard>
   )
 }
 
@@ -129,7 +126,7 @@ const ArticleStatusCard: React.FC = () => {
   const Icon = config.icon
 
   return (
-    <Card className="neural-neumorphic border-0 mb-4">
+    <NeuralCard className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -152,7 +149,7 @@ const ArticleStatusCard: React.FC = () => {
           </Badge>
         </div>
       </CardContent>
-    </Card>
+    </NeuralCard>
   )
 }
 
@@ -177,13 +174,13 @@ const ArticleEditor: React.FC = () => {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold neural-title text-sm">Content Editor</h3>
-        <Button
+        <NeuralButton
           size="sm"
           className="neural-gradient-primary text-white border-0 h-8 px-3 text-xs"
         >
           <Save className="h-3 w-3 mr-1" />
           Save
-        </Button>
+        </NeuralButton>
       </div>
       
       <Textarea
@@ -218,32 +215,39 @@ const ArticlePreview: React.FC = () => {
       <div className="flex items-center justify-between">
         <h3 className="font-semibold neural-title text-sm">Preview</h3>
         <div className="flex items-center gap-2">
-          <Button
+          <NeuralButton
             variant="ghost"
             size="sm"
             className="neural-button h-8 px-3 text-xs"
           >
             <Copy className="h-3 w-3 mr-1" />
             Copy
-          </Button>
-          <Button
+          </NeuralButton>
+          <NeuralButton
             variant="ghost"
             size="sm"
             className="neural-button h-8 px-3 text-xs"
           >
             <ExternalLink className="h-3 w-3 mr-1" />
             Open
-          </Button>
+          </NeuralButton>
         </div>
       </div>
       
       <div className="neural-neumorphic-inset p-6 bg-neural-surface rounded-lg overflow-y-auto max-h-[400px]">
-        <div 
-          className="neural-text-primary prose prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ 
-            __html: formatContent(currentArticle.content) 
-          }}
-        />
+        {currentArticle.content ? (
+          <div 
+            className="neural-text-primary prose prose-sm max-w-none leading-relaxed"
+            dangerouslySetInnerHTML={{ 
+              __html: formatContent(currentArticle.content) 
+            }}
+          />
+        ) : (
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 text-neural-text-muted mx-auto mb-4" />
+            <div className="text-neural-text-secondary">コンテンツが生成されています...</div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -268,7 +272,19 @@ const EmptyState: React.FC = () => (
 )
 
 export function PreviewColumn() {
-  const { currentArticle, previewMode, saveArticle } = useWorkspaceStore()
+  const { currentArticle, previewMode, saveArticle, generationState } = useWorkspaceStore()
+  const [showNewArticleEffect, setShowNewArticleEffect] = React.useState(false)
+
+  // 新しい記事が生成された時のエフェクト
+  React.useEffect(() => {
+    if (currentArticle && generationState.stage === 'completed') {
+      setShowNewArticleEffect(true)
+      const timer = setTimeout(() => {
+        setShowNewArticleEffect(false)
+      }, 3000) // 3秒間エフェクトを表示
+      return () => clearTimeout(timer)
+    }
+  }, [currentArticle, generationState.stage])
 
   const handleSave = async () => {
     await saveArticle()
@@ -279,10 +295,20 @@ export function PreviewColumn() {
   }
 
   return (
-    <div className="h-full flex flex-col p-4">
+    <div className={cn(
+      "h-full flex flex-col p-4 transition-all duration-500",
+      showNewArticleEffect && "ring-2 ring-neural-cyan shadow-lg shadow-neural-cyan/30"
+    )}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold neural-title">Article Preview</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-bold neural-title">Article Preview</h2>
+          {showNewArticleEffect && (
+            <Badge className="neural-gradient-success text-white border-0 text-xs animate-pulse">
+              ✨ 新規生成
+            </Badge>
+          )}
+        </div>
         <PreviewModeToggle />
       </div>
 
@@ -311,37 +337,37 @@ export function PreviewColumn() {
       {/* Actions */}
       <div className="mt-4 pt-4 border-t border-neural-elevated/20">
         <div className="flex items-center gap-2">
-          <Button
+          <NeuralButton
             className="neural-gradient-primary text-white border-0 flex-1"
             onClick={handleSave}
           >
             <Save className="h-4 w-4 mr-2" />
             Save Article
-          </Button>
+          </NeuralButton>
           
-          <Button
+          <NeuralButton
             variant="outline"
             className="neural-button"
           >
             <Download className="h-4 w-4 mr-2" />
             Export
-          </Button>
+          </NeuralButton>
           
-          <Button
+          <NeuralButton
             variant="outline"
             className="neural-button"
           >
             <Share2 className="h-4 w-4 mr-2" />
             Share
-          </Button>
+          </NeuralButton>
           
-          <Button
+          <NeuralButton
             variant="ghost"
             size="sm"
             className="neural-button"
           >
             <Settings className="h-4 w-4" />
-          </Button>
+          </NeuralButton>
         </div>
       </div>
     </div>

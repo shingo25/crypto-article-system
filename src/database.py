@@ -238,6 +238,8 @@ class ArticleTemplate(Base):
 # データベース初期化関数
 def create_tables():
     """テーブルを作成"""
+    # 認証関連テーブルも含めて作成
+    from .auth_models import User, APIKey, RefreshToken, LoginSession
     Base.metadata.create_all(bind=engine)
 
 

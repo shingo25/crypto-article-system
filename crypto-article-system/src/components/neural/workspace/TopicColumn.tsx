@@ -45,16 +45,16 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
   return (
     <NeuralCard 
       className={cn(
-        "group cursor-pointer neural-transition mb-4",
-        isSelected && "ring-2 ring-neural-cyan shadow-lg shadow-neural-cyan/20"
+        "group cursor-pointer neural-transition mb-3 hover:scale-[1.02] hover:shadow-xl",
+        isSelected && "ring-2 ring-neural-cyan shadow-lg shadow-neural-cyan/20 scale-[1.02]"
       )}
       onClick={() => onSelect(topic)}
     >
       <CardContent className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
-          <Badge className={cn("text-white border-0 text-xs", priorityColors[topic.priority] || 'neural-gradient-primary')}>
-            <span className="mr-1">{priorityIcons[topic.priority] || '💡'}</span>
+          <Badge className={cn("text-white border-0 text-xs px-2 py-0.5", priorityColors[topic.priority] || 'neural-gradient-primary')}>
+            <span className="mr-1 text-sm">{priorityIcons[topic.priority] || '💡'}</span>
             {topic.priority?.toUpperCase() || 'MEDIUM'}
           </Badge>
           
@@ -75,23 +75,23 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
         </div>
 
         {/* Title */}
-        <h3 className="neural-title font-semibold mb-2 line-clamp-2 text-sm leading-tight group-hover:text-neural-cyan neural-transition">
+        <h3 className="neural-title font-semibold mb-3 line-clamp-2 text-sm leading-relaxed group-hover:text-neural-cyan neural-transition">
           {topic.summary}
         </h3>
 
         {/* Coins */}
-        <div className="flex flex-wrap gap-1 mb-3">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {topic.coins?.slice(0, 3).map((coin: string) => (
             <div 
               key={coin} 
-              className="flex items-center gap-1 px-2 py-1 bg-neural-surface rounded-full border border-neural-elevated/50"
+              className="flex items-center gap-1 px-2.5 py-1 bg-neural-surface/80 rounded-full border border-neural-elevated/50 hover:border-neural-cyan/50 transition-colors"
             >
               <TrendingUp className="h-3 w-3 text-neural-success" />
               <span className="text-neural-text-secondary text-xs font-medium">{coin}</span>
             </div>
           ))}
           {topic.coins?.length > 3 && (
-            <div className="px-2 py-1 bg-neural-elevated/30 rounded-full">
+            <div className="px-2.5 py-1 bg-neural-elevated/30 rounded-full">
               <span className="text-neural-text-muted text-xs">+{topic.coins.length - 3}</span>
             </div>
           )}
@@ -119,7 +119,7 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
               }}
             >
               <Sparkles className="h-3 w-3 mr-1" />
-              Generate
+              記事生成
             </NeuralButton>
           </div>
         </div>
@@ -173,7 +173,7 @@ export function TopicColumn() {
             placeholder="Search topics, coins..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9 text-sm"
           />
         </div>
 
@@ -205,7 +205,7 @@ export function TopicColumn() {
       </div>
 
       {/* Topics List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-neural-elevated/30 scrollbar-track-transparent">
         {isLoading && filteredTopics.length === 0 ? (
           <LoadingSkeleton count={5} className="space-y-4" />
         ) : filteredTopics.length === 0 ? (

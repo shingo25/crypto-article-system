@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { QueryProvider } from '@/lib/query-provider'
-import { AuthProvider } from '@/lib/auth-context'
+// AuthProviderは上位のlayout.tsxで既に適用済みのため削除
 import { useCommandPalette } from '@/hooks/useCommandPalette'
 import { CommandPalette } from '@/components/CommandPalette'
 import { AuroraBackground, useAuroraSettings } from '@/components/ui/aurora-background'
@@ -24,33 +24,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryProvider>
-      <AuthProvider>
-        {isMounted && (
-          <AuroraBackground 
-            intensity={auroraSettings.intensity}
-            showParticles={auroraSettings.showParticles}
+      {isMounted && (
+        <AuroraBackground 
+          intensity={auroraSettings.intensity}
+          showParticles={auroraSettings.showParticles}
+        />
+      )}
+      {children}
+      {isMounted && (
+        <>
+          <CommandPalette isOpen={isOpen} onClose={close} />
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: 'hsl(var(--neural-surface))',
+                color: 'hsl(var(--neural-text-primary))',
+                border: '1px solid hsl(var(--neural-elevated))',
+                borderRadius: '1rem',
+                backdropFilter: 'blur(8px)',
+              },
+            }}
           />
-        )}
-        {children}
-        {isMounted && (
-          <>
-            <CommandPalette isOpen={isOpen} onClose={close} />
-            <Toaster 
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: 'hsl(var(--neural-surface))',
-                  color: 'hsl(var(--neural-text-primary))',
-                  border: '1px solid hsl(var(--neural-elevated))',
-                  borderRadius: '1rem',
-                  backdropFilter: 'blur(8px)',
-                },
-              }}
-            />
-          </>
-        )}
-      </AuthProvider>
+        </>
+      )}
     </QueryProvider>
   )
 }

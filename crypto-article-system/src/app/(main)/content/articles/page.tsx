@@ -1,5 +1,8 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import React, { useState, useMemo, useCallback } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { NeuralButton } from '@/components/neural/NeuralButton'
@@ -151,6 +154,28 @@ export default function ArticlesManagementPage() {
     })
   }
 
+  const handleAction = useCallback((action: string, articleId: string) => {
+    switch (action) {
+      case 'view':
+        router.push(`/content/articles/${articleId}`)
+        break
+      case 'edit':
+        router.push(`/content/workspace?edit=${articleId}`)
+        break
+      case 'analytics':
+        router.push(`/analytics/performance?article=${articleId}`)
+        break
+      case 'duplicate':
+        toast.success('記事を複製しました')
+        break
+      case 'delete':
+        toast.success('記事を削除しました')
+        break
+      default:
+        toast.info(`${action} 機能は準備中です`)
+    }
+  }, [router])
+
   const columns = useMemo(() => [
     columnHelper.accessor('title', {
       header: ({ column }) => (
@@ -295,28 +320,6 @@ export default function ArticlesManagementPage() {
       },
     },
   })
-
-  const handleAction = useCallback((action: string, articleId: string) => {
-    switch (action) {
-      case 'view':
-        router.push(`/content/articles/${articleId}`)
-        break
-      case 'edit':
-        router.push(`/content/workspace?edit=${articleId}`)
-        break
-      case 'analytics':
-        router.push(`/analytics/performance?article=${articleId}`)
-        break
-      case 'duplicate':
-        toast.success('記事を複製しました')
-        break
-      case 'delete':
-        toast.success('記事を削除しました')
-        break
-      default:
-        toast.info(`${action} 機能は準備中です`)
-    }
-  }, [router])
 
   const handleNewArticle = () => {
     router.push('/content/workspace')

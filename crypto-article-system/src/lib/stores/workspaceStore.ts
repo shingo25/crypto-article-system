@@ -1,101 +1,6 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 
-// モックコンテンツ生成ヘルパー
-function generateMockContent(topic: Topic, settings: GenerationSettings): string {
-  const coins = topic.coins.join(', ')
-  const date = new Date().toLocaleDateString('ja-JP')
-  
-  const styleMap = {
-    professional: {
-      tone: '詳細な分析を通じて',
-      conclusion: '今後の市場動向に注視が必要です。'
-    },
-    casual: {
-      tone: 'わかりやすく解説すると',
-      conclusion: '引き続き注目していきましょう！'
-    },
-    analytical: {
-      tone: 'データに基づく分析によると',
-      conclusion: '統計的な観点から継続的な監視が推奨されます。'
-    },
-    technical: {
-      tone: 'テクニカル指標を用いた解析では',
-      conclusion: 'アルゴリズム分析の結果、慎重な判断が求められます。'
-    }
-  }
-
-  const lengthMap = {
-    short: 300,
-    medium: 600,
-    long: 1000
-  }
-
-  const style = styleMap[settings.style]
-  const targetLength = lengthMap[settings.length]
-  
-  let content = `# ${topic.summary}\n\n`
-  
-  content += `## 概要\n\n${date}時点での${coins}に関する市場分析レポートです。${style.tone}、現在の市場状況と今後の展望について考察します。\n\n`
-  
-  content += `## 主要ポイント\n\n`
-  content += `- **対象通貨**: ${coins}\n`
-  content += `- **分析時点**: ${date}\n`
-  content += `- **市場センチメント**: ${settings.tone === 'bullish' ? '強気' : settings.tone === 'bearish' ? '弱気' : '中立'}\n\n`
-  
-  content += `## 市場動向分析\n\n`
-  content += `${coins}の現在の市場状況を分析すると、複数の要因が価格動向に影響を与えています。${style.tone}、以下の点が特に注目されます：\n\n`
-  
-  content += `### テクニカル分析\n\n`
-  content += `- チャートパターンからは${settings.tone === 'bullish' ? '上昇' : settings.tone === 'bearish' ? '下降' : '横ばい'}トレンドが確認されています\n`
-  content += `- ボリューム指標は${Math.floor(Math.random() * 30 + 70)}%の水準で推移\n`
-  content += `- RSIは${Math.floor(Math.random() * 40 + 30)}付近で${settings.tone === 'bullish' ? '買い' : settings.tone === 'bearish' ? '売り' : '中立'}シグナルを示唆\n\n`
-  
-  if (settings.length !== 'short') {
-    content += `### ファンダメンタル要因\n\n`
-    content += `市場の基本的な要因として、以下の点が重要です：\n\n`
-    content += `- 規制環境の変化\n`
-    content += `- 機関投資家の動向\n`
-    content += `- 技術開発の進展\n`
-    content += `- マクロ経済指標の影響\n\n`
-    
-    if (settings.length === 'long') {
-      content += `### リスク分析\n\n`
-      content += `投資判断においては、以下のリスク要因も考慮する必要があります：\n\n`
-      content += `- **ボラティリティリスク**: 価格変動の大きさ\n`
-      content += `- **流動性リスク**: 市場での売買のしやすさ\n`
-      content += `- **規制リスク**: 法的環境の変化\n`
-      content += `- **技術リスク**: プロトコルやセキュリティの問題\n\n`
-      
-      content += `### 今後の展望\n\n`
-      content += `短期的には${settings.tone === 'bullish' ? '上昇' : settings.tone === 'bearish' ? '調整' : '方向感のない'}動きが予想されます。中長期的な視点では、以下の要因が重要になると考えられます：\n\n`
-      content += `1. 市場の成熟度向上\n`
-      content += `2. 制度整備の進展\n`
-      content += `3. 技術革新の継続\n`
-      content += `4. 採用拡大の加速\n\n`
-    }
-  }
-  
-  if (settings.seoOptimized) {
-    content += `## よくある質問（FAQ）\n\n`
-    content += `**Q: ${coins}への投資は今が買い時ですか？**\n`
-    content += `A: 投資判断は個人の責任において行ってください。十分なリスク管理と情報収集が重要です。\n\n`
-    content += `**Q: 今後の価格予想は？**\n`
-    content += `A: 市場は常に変動しており、正確な予想は困難です。複数の指標を総合的に判断することが大切です。\n\n`
-  }
-  
-  content += `## まとめ\n\n`
-  content += `${coins}の市場分析を通じて、現在の状況と今後の見通しについて考察しました。${style.conclusion}\n\n`
-  
-  if (settings.seoOptimized) {
-    content += `---\n\n`
-    content += `*この記事は${date}時点の情報に基づいています。投資判断は自己責任で行ってください。*\n\n`
-    content += `**関連キーワード**: ${topic.coins.join(', ')}, 仮想通貨, ブロックチェーン, 投資分析, 市場動向`
-  }
-  
-  return content
-}
-
 // Topic型定義（既存のTypeScript型と整合）
 export interface Topic {
   id: string
@@ -200,6 +105,86 @@ const initialGenerationSettings: GenerationSettings = {
   tone: 'neutral'
 }
 
+// モック記事コンテンツ生成関数
+function generateMockContent(topic: Topic, settings: GenerationSettings): string {
+  const { coins, summary } = topic
+  const coinList = coins.join('、')
+  
+  const introTemplates = [
+    `${coinList}の最新動向について詳しく解説します。`,
+    `暗号通貨市場で注目を集めている${coinList}の分析レポートをお届けします。`,
+    `${summary}について、市場データと専門的な観点から分析します。`
+  ]
+  
+  const bodyTemplates = [
+    `## 市場分析
+
+${coinList}は近日中に重要な価格変動を示しており、投資家の関心が高まっています。技術的分析によると、以下の要因が価格に影響を与えています：
+
+- **需給バランスの変化**: 機関投資家の参入により需要が増加
+- **技術的進歩**: ブロックチェーン技術の改良とスケーラビリティの向上  
+- **規制環境**: 各国の暗号通貨規制の明確化
+
+## 投資戦略
+
+現在の市場状況を踏まえ、以下の投資戦略を検討することをお勧めします：
+
+1. **長期保有戦略**: ファンダメンタルズに基づく投資
+2. **ドルコスト平均法**: 定期的な小額投資によるリスク分散
+3. **テクニカル分析**: チャートパターンに基づく売買タイミングの判断
+
+## まとめ
+
+${summary}は今後も注目すべき重要なトピックです。投資判断を行う際は、常に最新の市場情報を確認し、リスク管理を徹底することが重要です。`,
+
+    `## 詳細分析
+
+${summary}に関して、以下の重要なポイントを詳しく解説します。
+
+### 技術的背景
+
+${coinList}の基盤技術は、従来の金融システムに革新をもたらす可能性を秘めています。特に以下の特徴が注目されています：
+
+- **セキュリティ**: 暗号学的ハッシュ関数による高度なセキュリティ
+- **透明性**: 全ての取引がブロックチェーン上で公開・検証可能
+- **分散性**: 中央集権的な管理者不要の自律的システム
+
+### 市場への影響
+
+この動向は暗号通貨市場全体に以下の影響を与える可能性があります：
+
+1. **価格への影響**: 短期的な価格変動の要因
+2. **取引量の変化**: 市場流動性への影響
+3. **投資家心理**: センチメント指標への反映
+
+### 今後の展望
+
+専門家の見解では、${coinList}は以下の発展が期待されています：
+
+- 新たな技術革新の導入
+- 実用性の向上とユースケースの拡大
+- 機関投資家による本格的な参入
+
+## 結論
+
+${summary}は暗号通貨業界の重要なマイルストーンとなる可能性が高く、今後の動向に注目が集まります。`
+  ]
+  
+  const intro = introTemplates[Math.floor(Math.random() * introTemplates.length)]
+  const body = bodyTemplates[Math.floor(Math.random() * bodyTemplates.length)]
+  
+  let content = `# ${summary}\n\n${intro}\n\n${body}`
+  
+  // 記事の長さ調整
+  if (settings.length === 'short') {
+    content = content.substring(0, Math.floor(content.length * 0.6))
+  } else if (settings.length === 'long') {
+    content += `\n\n## 追加分析\n\n詳細な市場データとチャート分析により、${coinList}の今後の価格動向を予測します。テクニカル指標RSI、MACD、ボリンジャーバンドを組み合わせた分析結果をお届けします。`
+  }
+  
+  return content
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   devtools(
     (set, get) => ({
@@ -286,14 +271,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             // 実際のAPI呼び出し（generateArticleメソッドが存在する場合）
             const generationRequest = {
-              topic_id: selectedTopic.id,
-              topic_summary: selectedTopic.summary,
-              coins: selectedTopic.coins,
-              style: generationSettings.style,
-              length: generationSettings.length,
-              include_images: generationSettings.includeImages,
-              seo_optimized: generationSettings.seoOptimized,
-              tone: generationSettings.tone
+              topicId: selectedTopic.id,
+              type: generationSettings.style,
+              depth: generationSettings.length,
+              keywords: selectedTopic.coins
             }
 
             setGenerationState({ 
@@ -304,51 +285,112 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               estimatedTime: 8
             })
 
-            // TODO: 実際のAPIエンドポイントが利用可能になったら使用
-            // const response = await apiClient.generateArticle(generationRequest)
-            
-            // フォールバック: モック生成
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            
-            setGenerationState({ 
-              ...get().generationState, 
-              progress: 80, 
-              currentStep: 'Optimizing content structure...',
-              stage: 'optimizing',
-              estimatedTime: 3
+            // 実際のAPIエンドポイントを使用
+            const response = await apiClient.generateArticle(selectedTopic.id, {
+              type: generationSettings.style,
+              depth: generationSettings.length,
+              keywords: selectedTopic.coins
             })
 
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            if (response.success && response.taskId) {
+              // 非同期生成の場合、タスクステータスを監視
+              setGenerationState({ 
+                ...get().generationState, 
+                progress: 60, 
+                currentStep: 'AI processing your request...',
+                stage: 'writing',
+                estimatedTime: 6
+              })
 
-            const generatedArticle: Article = {
-              id: `article-${Date.now()}`,
-              topicId: selectedTopic.id,
-              title: `${selectedTopic.summary} - 市場分析レポート`,
-              content: generateMockContent(selectedTopic, generationSettings),
-              status: 'draft',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              metadata: {
-                wordCount: 750,
-                readingTime: 3,
-                keywords: selectedTopic.coins,
-                seoScore: 88,
-                sentiment: generationSettings.tone,
-                language: 'ja',
-                updatedAt: new Date().toISOString()
+              // タスク完了まで待機
+              let taskComplete = false
+              let attempts = 0
+              const maxAttempts = 30 // 5分間
+
+              while (!taskComplete && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 10000)) // 10秒待機
+                attempts++
+
+                try {
+                  const taskStatus = await apiClient.getTaskStatus(response.taskId)
+                  
+                  if (taskStatus.status === 'completed' && taskStatus.result) {
+                    const generatedArticle: Article = {
+                      id: `article-${Date.now()}`,
+                      topicId: selectedTopic.id,
+                      title: taskStatus.result.title || `${selectedTopic.summary} - 市場分析レポート`,
+                      content: taskStatus.result.content || generateMockContent(selectedTopic, generationSettings),
+                      status: 'draft',
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      metadata: {
+                        wordCount: taskStatus.result.word_count || 750,
+                        readingTime: Math.ceil((taskStatus.result.word_count || 750) / 250),
+                        keywords: selectedTopic.coins,
+                        seoScore: 88,
+                        sentiment: generationSettings.tone,
+                        language: 'ja',
+                        updatedAt: new Date().toISOString()
+                      }
+                    }
+
+                    setCurrentArticle(generatedArticle)
+                    setGenerationState({
+                      isGenerating: false,
+                      progress: 100,
+                      currentStep: 'AI記事生成完了！',
+                      stage: 'completed',
+                      startedAt: null,
+                      error: null,
+                      estimatedTime: 0
+                    })
+                    
+                    // 生成完了時のUI切り替え（Preview列に自動遷移）
+                    const { setActiveColumn } = get()
+                    
+                    // 成功通知を表示
+                    if (typeof window !== 'undefined') {
+                      const { toast } = await import('react-hot-toast')
+                      toast.success(`記事「${generatedArticle.title}」の生成が完了しました！`, {
+                        duration: 4000,
+                        position: 'bottom-right',
+                        style: {
+                          background: 'var(--neural-surface)',
+                          color: 'var(--neural-text-primary)',
+                          border: '1px solid var(--neural-success)',
+                        }
+                      })
+                    }
+                    
+                    setTimeout(() => {
+                      setActiveColumn('preview')
+                    }, 500) // 0.5秒後にPreviewに切り替え
+                    
+                    taskComplete = true
+                    return // 成功時は関数を終了
+                  } else if (taskStatus.status === 'failed') {
+                    throw new Error(taskStatus.error || 'Generation failed')
+                  } else {
+                    // まだ処理中
+                    setGenerationState({ 
+                      ...get().generationState, 
+                      progress: Math.min(60 + (attempts * 2), 90),
+                      currentStep: `AI generating... (${attempts}/30)`,
+                      estimatedTime: Math.max(6 - attempts, 1)
+                    })
+                  }
+                } catch (statusError) {
+                  console.warn('Task status check failed:', statusError)
+                  break
+                }
               }
-            }
 
-            setCurrentArticle(generatedArticle)
-            setGenerationState({
-              isGenerating: false,
-              progress: 100,
-              currentStep: 'Article generation completed!',
-              stage: 'completed',
-              startedAt: null,
-              error: null,
-              estimatedTime: 0
-            })
+              if (!taskComplete) {
+                throw new Error('Generation timed out')
+              }
+            } else {
+              throw new Error(response.message || 'API generation failed')
+            }
 
           } catch (apiError) {
             console.warn('API generation failed, using fallback:', apiError)
@@ -387,12 +429,33 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             setGenerationState({
               isGenerating: false,
               progress: 100,
-              currentStep: 'Generation complete (fallback mode)',
+              currentStep: '記事生成完了（フォールバックモード）',
               stage: 'completed',
               startedAt: null,
               error: null,
               estimatedTime: 0
             })
+            
+            // 生成完了時のUI切り替え（Preview列に自動遷移）
+            const { setActiveColumn } = get()
+            
+            // 成功通知を表示（フォールバックモード）
+            if (typeof window !== 'undefined') {
+              const { toast } = await import('react-hot-toast')
+              toast.success(`記事「${fallbackArticle.title}」の生成が完了しました！`, {
+                duration: 4000,
+                position: 'bottom-right',
+                style: {
+                  background: 'var(--neural-surface)',
+                  color: 'var(--neural-text-primary)',
+                  border: '1px solid var(--neural-success)',
+                }
+              })
+            }
+            
+            setTimeout(() => {
+              setActiveColumn('preview')
+            }, 500) // 0.5秒後にPreviewに切り替え
           }
 
         } catch (error) {

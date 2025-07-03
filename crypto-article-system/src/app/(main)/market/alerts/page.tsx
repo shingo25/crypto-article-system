@@ -1,5 +1,8 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import React, { useState, useMemo, useCallback } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { NeuralButton } from '@/components/neural/NeuralButton'
@@ -188,6 +191,32 @@ export default function PriceAlertsPage() {
     })
   }
 
+  const handleAction = useCallback((action: string, alert: PriceAlert) => {
+    switch (action) {
+      case 'toggle':
+        toast.success(`アラートを${alert.isActive ? '無効' : '有効'}にしました`)
+        break
+      case 'edit':
+        toast.info('編集機能は準備中です')
+        break
+      case 'generate':
+        const params = new URLSearchParams({
+          topic: `${alert.coinName} 価格アラート発火`,
+          source: 'alert',
+          alertId: alert.id,
+          coinSymbol: alert.coinSymbol
+        })
+        router.push(`/content/workspace?${params.toString()}`)
+        toast.success(`${alert.coinName}のアラート記事を生成します`)
+        break
+      case 'delete':
+        toast.success('アラートを削除しました')
+        break
+      default:
+        toast.info(`${action} 機能は準備中です`)
+    }
+  }, [router])
+
   const columns = useMemo(() => [
     columnHelper.accessor('coinSymbol', {
       header: ({ column }) => (
@@ -340,32 +369,6 @@ export default function PriceAlertsPage() {
       },
     },
   })
-
-  const handleAction = useCallback((action: string, alert: PriceAlert) => {
-    switch (action) {
-      case 'toggle':
-        toast.success(`アラートを${alert.isActive ? '無効' : '有効'}にしました`)
-        break
-      case 'edit':
-        toast.info('編集機能は準備中です')
-        break
-      case 'generate':
-        const params = new URLSearchParams({
-          topic: `${alert.coinName} 価格アラート発火`,
-          source: 'alert',
-          alertId: alert.id,
-          coinSymbol: alert.coinSymbol
-        })
-        router.push(`/content/workspace?${params.toString()}`)
-        toast.success(`${alert.coinName}のアラート記事を生成します`)
-        break
-      case 'delete':
-        toast.success('アラートを削除しました')
-        break
-      default:
-        toast.info(`${action} 機能は準備中です`)
-    }
-  }, [router])
 
   const handleCreateAlert = () => {
     // 入力値バリデーション

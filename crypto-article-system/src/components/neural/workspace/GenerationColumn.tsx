@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
+import { NeuralButton } from '@/components/neural/NeuralButton'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { 
@@ -19,9 +19,23 @@ import {
   Target
 } from 'lucide-react'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
+import { useOptionalAuth } from '@/components/auth/AuthProvider'
+import { requireAuthForArticle } from '@/lib/auth-helpers'
 
 const GenerationProgress: React.FC = () => {
   const { generationState } = useWorkspaceStore()
+  const [showCompletionEffect, setShowCompletionEffect] = React.useState(false)
+
+  // 生成完了時のエフェクト
+  React.useEffect(() => {
+    if (generationState.stage === 'completed' && !generationState.isGenerating) {
+      setShowCompletionEffect(true)
+      const timer = setTimeout(() => {
+        setShowCompletionEffect(false)
+      }, 2000) // 2秒間エフェクトを表示
+      return () => clearTimeout(timer)
+    }
+  }, [generationState.stage, generationState.isGenerating])
 
   const stageLabels = {
     idle: 'Ready to generate',
@@ -46,15 +60,23 @@ const GenerationProgress: React.FC = () => {
   const Icon = stageIcons[generationState.stage]
 
   return (
-    <Card className="neural-neumorphic border-0 mb-4">
+    <NeuralCard className={cn(
+      "mb-4 transition-all duration-500",
+      showCompletionEffect && "ring-2 ring-neural-success shadow-lg shadow-neural-success/20"
+    )}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Icon className={cn(
-              "h-4 w-4",
-              generationState.isGenerating ? "text-neural-cyan animate-pulse" : "text-neural-text-muted"
+              "h-4 w-4 transition-all duration-300",
+              generationState.isGenerating ? "text-neural-cyan animate-pulse" : 
+              generationState.stage === 'completed' ? "text-neural-success" : "text-neural-text-muted",
+              showCompletionEffect && "scale-125"
             )} />
-            <span className="font-medium text-sm neural-title">
+            <span className={cn(
+              "font-medium text-sm neural-title transition-colors duration-300",
+              showCompletionEffect && "text-neural-success"
+            )}>
               {generationState.currentStep || stageLabels[generationState.stage]}
             </span>
           </div>
@@ -88,7 +110,7 @@ const GenerationProgress: React.FC = () => {
           </div>
         )}
       </CardContent>
-    </Card>
+    </NeuralCard>
   )
 }
 
@@ -101,7 +123,7 @@ const GenerationSettings: React.FC = () => {
   })
 
   return (
-    <Card className="neural-neumorphic border-0 mb-4">
+    <NeuralCard className="mb-4">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold neural-title flex items-center gap-2">
           <Settings className="h-4 w-4" />
@@ -116,7 +138,7 @@ const GenerationSettings: React.FC = () => {
           </label>
           <div className="grid grid-cols-3 gap-1">
             {['Professional', 'Casual', 'Technical'].map((style) => (
-              <Button
+              <NeuralButton
                 key={style}
                 variant="ghost"
                 size="sm"
@@ -127,7 +149,7 @@ const GenerationSettings: React.FC = () => {
                 onClick={() => setSettings(prev => ({ ...prev, style: style.toLowerCase() }))}
               >
                 {style}
-              </Button>
+              </NeuralButton>
             ))}
           </div>
         </div>
@@ -139,7 +161,7 @@ const GenerationSettings: React.FC = () => {
           </label>
           <div className="grid grid-cols-3 gap-1">
             {['Short', 'Medium', 'Long'].map((length) => (
-              <Button
+              <NeuralButton
                 key={length}
                 variant="ghost"
                 size="sm"
@@ -150,7 +172,7 @@ const GenerationSettings: React.FC = () => {
                 onClick={() => setSettings(prev => ({ ...prev, length: length.toLowerCase() }))}
               >
                 {length}
-              </Button>
+              </NeuralButton>
             ))}
           </div>
         </div>
@@ -178,7 +200,7 @@ const GenerationSettings: React.FC = () => {
           </label>
         </div>
       </CardContent>
-    </Card>
+    </NeuralCard>
   )
 }
 
@@ -187,7 +209,7 @@ const TopicSummary: React.FC = () => {
 
   if (!selectedTopic) {
     return (
-      <Card className="neural-neumorphic border-0 mb-4">
+      <NeuralCard className="mb-4">
         <CardContent className="p-6 text-center">
           <div className="text-4xl mb-3">🎯</div>
           <div className="neural-title text-neural-text-secondary">Select a topic</div>
@@ -195,12 +217,12 @@ const TopicSummary: React.FC = () => {
             Choose a topic from the left panel to start generating
           </div>
         </CardContent>
-      </Card>
+      </NeuralCard>
     )
   }
 
   return (
-    <Card className="neural-neumorphic border-0 mb-4">
+    <NeuralCard className="mb-4">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold neural-title flex items-center gap-2">
           <Target className="h-4 w-4 text-neural-cyan" />
@@ -230,11 +252,12 @@ const TopicSummary: React.FC = () => {
           </p>
         )}
       </CardContent>
-    </Card>
+    </NeuralCard>
   )
 }
 
 export function GenerationColumn() {
+  const { isAuthenticated } = useOptionalAuth()
   const { 
     selectedTopic, 
     generationState, 
@@ -243,6 +266,11 @@ export function GenerationColumn() {
   } = useWorkspaceStore()
 
   const handleStartGeneration = async () => {
+    // 認証チェック
+    if (!requireAuthForArticle(isAuthenticated)) {
+      return
+    }
+
     if (selectedTopic) {
       await startGeneration(selectedTopic)
     }
@@ -267,33 +295,33 @@ export function GenerationColumn() {
       {/* Actions */}
       <div className="space-y-2">
         {generationState.isGenerating ? (
-          <Button
+          <NeuralButton
             variant="outline"
             className="w-full neural-button border-neural-error text-neural-error hover:bg-neural-error/10"
             onClick={handleStopGeneration}
           >
             <Square className="h-4 w-4 mr-2" />
             Stop Generation
-          </Button>
+          </NeuralButton>
         ) : (
-          <Button
+          <NeuralButton
             className="w-full neural-gradient-primary text-white border-0"
             disabled={!selectedTopic}
             onClick={handleStartGeneration}
           >
             <Zap className="h-4 w-4 mr-2" />
             Generate Article
-          </Button>
+          </NeuralButton>
         )}
 
-        <Button
+        <NeuralButton
           variant="ghost"
-          className="w-full neural-button"
+          className="w-full"
           onClick={resetWorkspace}
         >
           <RotateCcw className="h-4 w-4 mr-2" />
           Reset Workspace
-        </Button>
+        </NeuralButton>
       </div>
 
       {/* Help Text */}

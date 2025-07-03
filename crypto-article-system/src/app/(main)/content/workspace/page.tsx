@@ -1,5 +1,8 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import React, { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { WorkspaceLayout } from '@/components/neural/workspace/WorkspaceLayout'
@@ -17,6 +20,8 @@ import {
 // import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { useOptionalAuth } from '@/components/auth/AuthProvider'
+import { requireAuthForArticle } from '@/lib/auth-helpers'
 
 interface MarketContext {
   topic: string
@@ -27,6 +32,7 @@ interface MarketContext {
 }
 
 function WorkspaceContent() {
+  const { isAuthenticated } = useOptionalAuth()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null)
@@ -59,6 +65,11 @@ function WorkspaceContent() {
   }, [searchParams])
 
   const handleAutoGenerate = async (context: MarketContext) => {
+    // 認証チェック
+    if (!requireAuthForArticle(isAuthenticated)) {
+      return
+    }
+
     if (!context.topic) return
 
     setIsGenerating(true)

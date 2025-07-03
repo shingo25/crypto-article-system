@@ -1,5 +1,8 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import React, { useState, useEffect } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { NeuralButton } from '@/components/neural/NeuralButton'
@@ -21,7 +24,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import Image from 'next/image'
+import { SafeImage } from '@/components/SafeImage'
 
 interface NewsItem {
   id: string
@@ -35,8 +38,15 @@ interface NewsItem {
   sentiment: number // -1 to 1
   importance: number // 1-10
   aiSummary?: string
-  topics: string[]
-  coins: string[]
+  // 構造化タグシステム
+  topics: string[]      // 一般的なトピック
+  coins: string[]       // 通貨・トークン
+  companies: string[]   // 企業・取引所
+  products: string[]    // 金融商品
+  technology: string[]  // 技術関連
+  market: string[]      // 市場動向
+  regulatory: string[]  // 規制・法的
+  regions: string[]     // 地域
   hasGeneratedArticle: boolean
   publishedAt: string
   createdAt: string
@@ -128,32 +138,99 @@ const mockNewsItems: NewsItem[] = [
 
 export default function NewsFeedPage() {
   const router = useRouter()
-  const [newsItems] = useState<NewsItem[]>(mockNewsItems)
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSource, setSelectedSource] = useState('all')
   const [selectedImportance, setSelectedImportance] = useState('all')
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [sources, setSources] = useState<string[]>(['all'])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [schedulerStatus, setSchedulerStatus] = useState<any>(null)
+
+  // スケジューラー状態を取得
+  const checkSchedulerStatus = async () => {
+    try {
+      const response = await fetch('/api/rss-scheduler')
+      const data = await response.json()
+      if (data.success) {
+        setSchedulerStatus(data.data)
+      }
+    } catch (error) {
+      console.error('Failed to check scheduler status:', error)
+    }
+  }
+
+  // スケジューラーを開始
+  const startScheduler = async () => {
+    try {
+      const response = await fetch('/api/rss-scheduler', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' })
+      })
+      const data = await response.json()
+      if (data.success) {
+        setSchedulerStatus(data.data)
+        toast.success('RSSスケジューラーを開始しました')
+      }
+    } catch (error) {
+      console.error('Failed to start scheduler:', error)
+      toast.error('スケジューラーの開始に失敗しました')
+    }
+  }
 
   const loadNewsData = async () => {
     setLoading(true)
     try {
-      // 実際のAPIコールに置き換え
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      // setNewsItems(newData)
-      toast.success('ニュースを更新しました')
-    } catch {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '15',
+        search: searchQuery,
+        source: selectedSource,
+        importance: selectedImportance
+      })
+
+      const response = await fetch(`/api/news?${params}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setNewsItems(data.data.items)
+        setTotalPages(data.data.pagination.totalPages)
+        setSources(['all', ...data.data.sources])
+        
+        if (data.data.items.length === 0 && page === 1) {
+          // 初回でデータがない場合は収集を開始
+          await fetch('/api/news', { method: 'POST' })
+          toast('ニュース収集を開始しました。しばらくお待ちください。', {
+            icon: '📰',
+            duration: 5000
+          })
+        }
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      console.error('Failed to load news:', error)
       toast.error('ニュースの取得に失敗しました')
     } finally {
       setLoading(false)
     }
   }
 
+  // 初回ロード
+  useEffect(() => {
+    loadNewsData()
+    checkSchedulerStatus()
+  }, [page, searchQuery, selectedSource, selectedImportance])
+
   useEffect(() => {
     if (!autoRefresh) return
 
     const interval = setInterval(() => {
       loadNewsData()
+      checkSchedulerStatus()
     }, 300000) // 5分間隔
 
     return () => clearInterval(interval)
@@ -197,9 +274,24 @@ export default function NewsFeedPage() {
   }
 
   const filteredNews = newsItems.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()))
+    const searchLower = searchQuery.toLowerCase()
+    
+    // 検索条件（タイトル、要約、全タグを検索対象に）
+    const allTags = [
+      ...(item.topics || []),
+      ...(item.coins || []),
+      ...(item.companies || []),
+      ...(item.products || []),
+      ...(item.technology || []),
+      ...(item.market || []),
+      ...(item.regulatory || []),
+      ...(item.regions || [])
+    ]
+    
+    const matchesSearch = item.title.toLowerCase().includes(searchLower) ||
+                         item.summary.toLowerCase().includes(searchLower) ||
+                         allTags.some(tag => tag.toLowerCase().includes(searchLower))
+    
     const matchesSource = selectedSource === 'all' || item.source === selectedSource
     const matchesImportance = selectedImportance === 'all' || 
                               (selectedImportance === 'high' && item.importance >= 8) ||
@@ -209,7 +301,6 @@ export default function NewsFeedPage() {
     return matchesSearch && matchesSource && matchesImportance
   })
 
-  const sources = ['all', ...Array.from(new Set(newsItems.map(item => item.source)))]
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen">
@@ -272,128 +363,221 @@ export default function NewsFeedPage() {
           <div className="text-sm text-neural-text-secondary">
             {filteredNews.length} 件のニュース
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-neural-text-secondary">自動更新</span>
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={cn(
-                "w-10 h-6 rounded-full relative transition-colors",
-                autoRefresh ? "bg-neural-cyan" : "bg-neural-surface"
-              )}
-            >
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <div className={cn(
-                "w-4 h-4 bg-white rounded-full absolute top-1 transition-transform",
-                autoRefresh ? "translate-x-5" : "translate-x-1"
-              )} />
-            </button>
+                "w-2 h-2 rounded-full",
+                schedulerStatus?.isRunning 
+                  ? "bg-green-400 animate-pulse" 
+                  : "bg-red-400"
+              )}></div>
+              <span className="text-xs text-neural-text-secondary">
+                {schedulerStatus?.isRunning ? 'RSS自動収集中' : 'RSS収集停止中'} (5分間隔)
+              </span>
+              {schedulerStatus && !schedulerStatus.isRunning && (
+                <NeuralButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={startScheduler}
+                  className="h-6 text-xs"
+                >
+                  開始
+                </NeuralButton>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neural-text-secondary">自動更新</span>
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={cn(
+                  "w-10 h-6 rounded-full relative transition-colors",
+                  autoRefresh ? "bg-neural-cyan" : "bg-neural-surface"
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 bg-white rounded-full absolute top-1 transition-transform",
+                  autoRefresh ? "translate-x-5" : "translate-x-1"
+                )} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* News Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* News Timeline - 1列レイアウト */}
+      <div className="space-y-4 max-w-4xl mx-auto">
         {filteredNews.map((item) => (
           <NeuralCard key={item.id} className="hover:shadow-xl neural-transition">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
+            <div className="flex gap-4 p-4">
+              {/* 左側: 画像とステータス */}
+              <div className="flex flex-col items-center gap-3 w-20 flex-shrink-0">
+                {item.imageUrl ? (
+                  <SafeImage
+                    src={item.imageUrl}
+                    alt={item.title}
+                    width={80}
+                    height={80}
+                    className="w-16 h-16 object-cover rounded-lg border border-neural-elevated"
+                    fallbackIcon={<Newspaper className="h-6 w-6 text-neural-text-muted" />}
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-neural-surface border border-neural-elevated rounded-lg flex items-center justify-center">
+                    <Newspaper className="h-6 w-6 text-neural-text-muted" />
+                  </div>
+                )}
+                <div className="flex flex-col items-center gap-1">
                   {getImportanceBadge(item.importance)}
                   {getSentimentIcon(item.sentiment)}
                 </div>
-                <div className="text-xs text-neural-text-muted">
-                  {formatTimeAgo(item.publishedAt)}
-                </div>
               </div>
-              
-              <CardTitle className="text-base line-clamp-2 leading-tight">
-                {item.title}
-              </CardTitle>
-              
-              <div className="flex items-center gap-2 text-xs text-neural-text-muted">
-                <Globe className="h-3 w-3" />
-                <span>{item.source}</span>
-                {item.author && (
-                  <>
-                    <span>•</span>
-                    <span>{item.author}</span>
-                  </>
-                )}
-              </div>
-            </CardHeader>
 
-            <CardContent className="space-y-4">
-              {item.imageUrl && (
-                <Image
-                  src={item.imageUrl}
-                  alt={item.title}
-                  width={400}
-                  height={128}
-                  className="w-full h-32 object-cover rounded-lg"
-                />
-              )}
-
-              <p className="text-sm text-neural-text-secondary line-clamp-3">
-                {item.summary}
-              </p>
-
-              {item.aiSummary && (
-                <div className="p-3 neural-neumorphic-inset rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="h-3 w-3 text-neural-warning" />
-                    <span className="text-xs font-medium neural-title">AI要約</span>
+              {/* 右側: コンテンツ */}
+              <div className="flex-1 space-y-3">
+                {/* ヘッダー */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold neural-title leading-tight mb-2">
+                      {item.title}
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-neural-text-muted">
+                      <Globe className="h-4 w-4" />
+                      <span>{item.source}</span>
+                      {item.author && (
+                        <>
+                          <span>•</span>
+                          <span>{item.author}</span>
+                        </>
+                      )}
+                      <span>•</span>
+                      <span>{formatTimeAgo(item.publishedAt)}</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-neural-text-secondary">
-                    {item.aiSummary}
-                  </p>
                 </div>
-              )}
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-1 flex-wrap">
-                  {item.topics.slice(0, 3).map((topic) => (
-                    <Badge key={topic} variant="outline" className="text-xs">
-                      <Tag className="h-2 w-2 mr-1" />
-                      {topic}
-                    </Badge>
-                  ))}
-                  {item.topics.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{item.topics.length - 3}
-                    </Badge>
+                {/* 要約 */}
+                <p className="text-neural-text-secondary leading-relaxed">
+                  {item.summary}
+                </p>
+
+                {/* AI要約 */}
+                {item.aiSummary && (
+                  <div className="p-3 neural-neumorphic-inset rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-4 w-4 text-neural-warning" />
+                      <span className="text-sm font-medium neural-title">AI要約</span>
+                    </div>
+                    <p className="text-sm text-neural-text-secondary">
+                      {item.aiSummary}
+                    </p>
+                  </div>
+                )}
+
+                {/* 構造化タグ表示 */}
+                <div className="space-y-2">
+                  {/* 通貨・トークン */}
+                  {item.coins && item.coins.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.coins.slice(0, 6).map((coin, index) => (
+                        <Badge key={`${item.id}-coin-${index}-${coin}`} className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                          💰 {typeof coin === 'string' ? coin : coin?.symbol || coin?.name || String(coin)}
+                        </Badge>
+                      ))}
+                      {item.coins.length > 6 && (
+                        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                          +{item.coins.length - 6}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* 企業・取引所 */}
+                  {item.companies && item.companies.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.companies.slice(0, 4).map((company, index) => (
+                        <Badge key={`${item.id}-company-${index}-${company}`} className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">
+                          🏢 {typeof company === 'string' ? company : company?.name || String(company)}
+                        </Badge>
+                      ))}
+                      {item.companies.length > 4 && (
+                        <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">
+                          +{item.companies.length - 4}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* 金融商品・技術・市場・規制 */}
+                  <div className="flex flex-wrap gap-1">
+                    {item.products && item.products.slice(0, 3).map((product, index) => (
+                      <Badge key={`${item.id}-product-${index}-${product}`} className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                        📦 {typeof product === 'string' ? product : product?.name || String(product)}
+                      </Badge>
+                    ))}
+                    {item.technology && item.technology.slice(0, 2).map((tech, index) => (
+                      <Badge key={`${item.id}-tech-${index}-${tech}`} className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs">
+                        ⚙️ {typeof tech === 'string' ? tech : tech?.name || String(tech)}
+                      </Badge>
+                    ))}
+                    {item.market && item.market.slice(0, 2).map((market, index) => (
+                      <Badge key={`${item.id}-market-${index}-${market}`} className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                        📈 {typeof market === 'string' ? market : market?.name || String(market)}
+                      </Badge>
+                    ))}
+                    {item.regulatory && item.regulatory.slice(0, 2).map((reg, index) => (
+                      <Badge key={`${item.id}-reg-${index}-${reg}`} className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                        ⚖️ {typeof reg === 'string' ? reg : reg?.name || String(reg)}
+                      </Badge>
+                    ))}
+                    {item.regions && item.regions.slice(0, 2).map((region, index) => (
+                      <Badge key={`${item.id}-region-${index}-${region}`} className="bg-indigo-500/20 text-indigo-400 border-indigo-500/30 text-xs">
+                        🌍 {typeof region === 'string' ? region : region?.name || String(region)}
+                      </Badge>
+                    ))}
+                  </div>
+                  
+                  {/* 一般トピック */}
+                  {item.topics && item.topics.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.topics.slice(0, 3).map((topic, index) => (
+                        <Badge key={`${item.id}-topic-${index}-${topic}`} variant="outline" className="text-xs">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {typeof topic === 'string' ? topic : topic?.name || String(topic)}
+                        </Badge>
+                      ))}
+                      {item.topics.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{item.topics.length - 3}
+                        </Badge>
+                      )}
+                    </div>
                   )}
                 </div>
-                
-                <div className="flex items-center gap-1 flex-wrap">
-                  {item.coins.map((coin) => (
-                    <Badge key={coin} className="bg-neural-cyan/20 text-neural-cyan border-neural-cyan/30 text-xs">
-                      {coin}
-                    </Badge>
-                  ))}
+
+                {/* アクションボタン */}
+                <div className="flex gap-3 pt-2">
+                  <NeuralButton
+                    variant="gradient"
+                    size="sm"
+                    onClick={() => handleGenerateArticle(item)}
+                    disabled={item.hasGeneratedArticle}
+                    className="flex-shrink-0"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {item.hasGeneratedArticle ? '生成済み' : '記事生成'}
+                  </NeuralButton>
+                  
+                  <NeuralButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open(item.url, '_blank')}
+                    className="flex-shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    ソースを開く
+                  </NeuralButton>
                 </div>
               </div>
-
-              <div className="flex gap-2">
-                <NeuralButton
-                  variant="gradient"
-                  size="sm"
-                  onClick={() => handleGenerateArticle(item)}
-                  disabled={item.hasGeneratedArticle}
-                  className="flex-1"
-                >
-                  <Sparkles className="h-3 w-3 mr-2" />
-                  {item.hasGeneratedArticle ? '生成済み' : '記事生成'}
-                </NeuralButton>
-                
-                <NeuralButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(item.url, '_blank')}
-                  className="shrink-0"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </NeuralButton>
-              </div>
-            </CardContent>
+            </div>
           </NeuralCard>
         ))}
       </div>
@@ -405,6 +589,31 @@ export default function NewsFeedPage() {
           <p className="text-neural-text-secondary">
             検索条件を変更するか、しばらく待ってから再度お試しください。
           </p>
+        </div>
+      )}
+
+      {/* ページネーション */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center gap-2">
+          <NeuralButton
+            variant="ghost"
+            size="sm"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            前へ
+          </NeuralButton>
+          <span className="px-4 py-2 text-neural-text-secondary">
+            {page} / {totalPages}
+          </span>
+          <NeuralButton
+            variant="ghost"
+            size="sm"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            次へ
+          </NeuralButton>
         </div>
       )}
     </div>

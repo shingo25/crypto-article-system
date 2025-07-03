@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/components/AppProvider";
 import { initializeErrorHandling } from "@/lib/error-handler";
+import { initializeApplication } from "@/lib/app-initializer";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,9 +27,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // エラーハンドリング初期化
+  // サーバーサイドでの初期化処理
   if (typeof window === 'undefined') {
     initializeErrorHandling()
+    // アプリケーション初期化（スケジューラー開始など）
+    initializeApplication().catch(error => {
+      console.error('Application initialization failed:', error)
+    })
   }
 
   return (
@@ -36,8 +42,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        {/* AppProviderでchildrenをラップする */}
-        <AppProvider>{children}</AppProvider>
+        {/* AuthProviderとAppProviderでchildrenをラップする */}
+        <AuthProvider>
+          <AppProvider>{children}</AppProvider>
+        </AuthProvider>
       </body>
     </html>
   );

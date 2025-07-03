@@ -1,5 +1,8 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import { TemplateManager } from '@/components/TemplateManager'
 
 export default function TemplatesPage() {

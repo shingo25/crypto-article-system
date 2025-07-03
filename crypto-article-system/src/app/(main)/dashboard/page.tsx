@@ -1,10 +1,14 @@
 'use client'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const dynamic = 'force-dynamic'
+
 import React from 'react'
 import { SystemMonitoringNeural } from '@/components/neural/dashboard/SystemMonitoringNeural'
 import { MarketDataNeural } from '@/components/neural/dashboard/MarketDataNeural'
 import { GenerationStatusNeural } from '@/components/neural/dashboard/GenerationStatusNeural'
 import { APIHealthNeural } from '@/components/neural/dashboard/APIHealthNeural'
+import { AIConfigNeural } from '@/components/neural/dashboard/AIConfigNeural'
 
 export default function DashboardPage() {
   return (
@@ -24,13 +28,18 @@ export default function DashboardPage() {
           <SystemMonitoringNeural />
         </div>
         
+        {/* AI Configuration Status */}
+        <AIConfigNeural />
+        
         {/* API Health Status */}
         <APIHealthNeural />
         
-        {/* Generation Status */}
-        <GenerationStatusNeural />
+        {/* Generation Status - full row on mobile, single column otherwise */}
+        <div className="md:col-span-1 lg:col-span-2 xl:col-span-1">
+          <GenerationStatusNeural />
+        </div>
         
-        {/* Market Data Widget - spans 2 columns on larger screens */}
+        {/* Market Data Widget - spans full width */}
         <div className="md:col-span-2 lg:col-span-3 xl:col-span-4">
           <MarketDataNeural />
         </div>

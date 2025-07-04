@@ -7,9 +7,19 @@ import React, { useState } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Settings, Brain, Globe, Palette, Shield, Rss } from 'lucide-react'
-import AIModelSettings from '@/components/AIModelSettings'
-import WordPressSettings from '@/components/WordPressSettings'
-import RSSSourceManager from '@/components/RSSSourceManager'
+import dynamic from 'next/dynamic'
+
+const AIModelSettings = dynamic(() => import('@/components/AIModelSettings'), {
+  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>
+})
+
+const WordPressSettings = dynamic(() => import('@/components/WordPressSettings'), {
+  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>
+})
+
+const RSSSourceManager = dynamic(() => import('@/components/RSSSourceManager'), {
+  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>
+})
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('ai-models')

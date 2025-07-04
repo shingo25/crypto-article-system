@@ -14,10 +14,12 @@ import {
   Zap,
   HardDrive,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bell
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { useWebSocket } from '@/hooks/useWebSocket'
 
 interface SystemStatus {
   overall: 'healthy' | 'warning' | 'error'
@@ -42,6 +44,9 @@ export function SystemStatusBar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  
+  // WebSocketからアラート情報を取得
+  const { alerts, isConnected } = useWebSocket('http://localhost:3002')
 
   const loadSystemStatus = async () => {
     try {
@@ -155,6 +160,15 @@ export function SystemStatusBar() {
               <HardDrive className="h-3 w-3" />
               <span>CPU: {status.system.cpu}%</span>
             </div>
+            {/* アラート数表示 */}
+            {alerts.length > 0 && (
+              <div className="flex items-center gap-1">
+                <Bell className={cn("h-3 w-3", alerts.some(a => a.level === 'high') ? "text-neural-error animate-pulse" : "text-neural-warning")} />
+                <span className={cn(alerts.some(a => a.level === 'high') ? "text-neural-error font-semibold" : "")}>
+                  {alerts.length} alerts
+                </span>
+              </div>
+            )}
           </div>
         </div>
         

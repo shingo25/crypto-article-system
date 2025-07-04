@@ -1,11 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// レート制限設定
+const RATE_LIMIT_MAP = new Map<string, { count: number; lastReset: number }>()
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000 // 15分
+const RATE_LIMIT_MAX_REQUESTS = 100 // 15分間に100リクエスト
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const userLimit = RATE_LIMIT_MAP.get(ip)
+  
+  if (!userLimit) {
+    RATE_LIMIT_MAP.set(ip, { count: 1, lastReset: now })
+    return true
+  }
+  
+  // リセット時間を過ぎている場合
+  if (now - userLimit.lastReset > RATE_LIMIT_WINDOW) {
+    RATE_LIMIT_MAP.set(ip, { count: 1, lastReset: now })
+    return true
+  }
+  
+  // リクエスト数をチェック
+  if (userLimit.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false
+  }
+  
+  // カウントを増加
+  userLimit.count++
+  return true
+}
+
+function getClientIP(request: NextRequest): string {
+  // Vercel, Cloudflare, その他のプロキシからのIPを取得
+  const forwarded = request.headers.get('x-forwarded-for')
+  const realIP = request.headers.get('x-real-ip')
+  const cfConnectingIP = request.headers.get('cf-connecting-ip')
+  
+  if (cfConnectingIP) return cfConnectingIP
+  if (realIP) return realIP
+  if (forwarded) return forwarded.split(',')[0].trim()
+  
+  return 'unknown'
+}
+
 export function middleware(request: NextRequest) {
   // 開発環境でのみデバッグログを出力
   const isDev = process.env.NODE_ENV === 'development'
   
   // リクエストIDを生成
   const requestId = Math.random().toString(36).substring(2, 15)
+  
+  // レート制限チェック
+  const ip = getClientIP(request)
+  if (!checkRateLimit(ip)) {
+    console.warn(`[${new Date().toISOString()}] レート制限超過: ${ip} ${request.url}`)
+    return NextResponse.json(
+      { error: 'Rate limit exceeded' },
+      { status: 429 }
+    )
+  }
   
   // セキュリティチェック：保護対象のパス（より具体的に指定）
   const protectedPaths = ['/content', '/market', '/analytics', '/settings']

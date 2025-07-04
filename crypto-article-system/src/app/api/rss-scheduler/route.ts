@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // モックスケジューラー状態
-let schedulerState = {
+const schedulerState = {
   isRunning: false,
   lastRun: null as string | null,
   nextRun: null as string | null,

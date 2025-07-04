@@ -6,22 +6,22 @@ const logger = createLogger('SourceAPI')
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-
+    const resolvedParams = await params
     const body = await request.json()
     const { active } = body
 
     const source = await prisma.rSSSource.update({
-      where: { id: params.id },
+      where: { id: resolvedParams.id },
       data: {
         enabled: active,
         status: active ? 'active' : 'inactive'
       }
     })
 
-    logger.info('RSSソースを更新', { sourceId: params.id, active })
+    logger.info('RSSソースを更新', { sourceId: resolvedParams.id, active })
 
     return NextResponse.json({
       success: true,
@@ -42,15 +42,15 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-
+    const resolvedParams = await params
     await prisma.rSSSource.delete({
-      where: { id: params.id }
+      where: { id: resolvedParams.id }
     })
 
-    logger.info('RSSソースを削除', { sourceId: params.id })
+    logger.info('RSSソースを削除', { sourceId: resolvedParams.id })
 
     return NextResponse.json({
       success: true

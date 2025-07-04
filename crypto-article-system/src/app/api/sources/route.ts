@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@/generated/prisma'
 import { createLogger } from '@/lib/logger'
+import { rssSourceSchema, createValidationMiddleware } from '@/lib/validation'
 
 const prisma = new PrismaClient()
 
@@ -45,16 +46,25 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-
     const body = await request.json()
-    const { name, url, type = 'news', description } = body
-
-    if (!name || !url) {
+    
+    // 入力検証
+    const validate = createValidationMiddleware(rssSourceSchema)
+    const validationResult = validate(body)
+    
+    if (!validationResult.success) {
+      logger.warn('入力検証エラー', { errors: validationResult.errors })
       return NextResponse.json(
-        { success: false, error: 'Name and URL are required' },
+        { 
+          success: false, 
+          error: 'Validation failed',
+          details: validationResult.errors
+        },
         { status: 400 }
       )
     }
+    
+    const { name, url, description, category } = validationResult.data
 
     // URLの重複チェック
     const existing = await prisma.rSSSource.findUnique({
@@ -72,7 +82,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         url,
-        category: type,
+        category: category || 'news',
         description
       }
     })

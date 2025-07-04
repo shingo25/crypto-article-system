@@ -9,12 +9,12 @@ const logger = createLogger('CollectAPI')
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-
+    const resolvedParams = await params
     const source = await prisma.rSSSource.findUnique({
-      where: { id: params.id }
+      where: { id: resolvedParams.id }
     })
 
     if (!source) {
@@ -31,7 +31,7 @@ export async function POST(
       )
     }
 
-    logger.info('単一ソースからの収集を開始', { sourceId: params.id, url: source.url })
+    logger.info('単一ソースからの収集を開始', { sourceId: resolvedParams.id, url: source.url })
 
     const rssService = new RSSParserService()
 
@@ -42,7 +42,7 @@ export async function POST(
         
         // ソースの統計を更新
         await prisma.rSSSource.update({
-          where: { id: params.id },
+          where: { id: resolvedParams.id },
           data: {
             lastCollected: new Date(),
             totalCollected: {
@@ -53,17 +53,17 @@ export async function POST(
         })
 
         logger.info('単一ソースからの収集が完了', {
-          sourceId: params.id,
+          sourceId: resolvedParams.id,
           itemsFound: items.length,
           itemsSaved: savedCount
         })
       })
       .catch(async (error) => {
-        logger.error('単一ソースからの収集エラー', error as Error, { sourceId: params.id })
+        logger.error('単一ソースからの収集エラー', error as Error, { sourceId: resolvedParams.id })
         
         // エラーステータスを更新
         await prisma.rSSSource.update({
-          where: { id: params.id },
+          where: { id: resolvedParams.id },
           data: { status: 'error' }
         })
       })

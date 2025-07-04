@@ -57,7 +57,11 @@ interface MarketPulseData {
   trending_topics: string[]
 }
 
-export function MarketPulse() {
+interface MarketPulseProps {
+  viewMode?: 'full' | 'compact'
+}
+
+export function MarketPulse({ viewMode = 'full' }: MarketPulseProps) {
   const { isAuthenticated } = useOptionalAuth()
   const [marketData, setMarketData] = useState<MarketPulseData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -395,6 +399,113 @@ export function MarketPulse() {
     )
   }
 
+  // コンパクトモードのレンダリング
+  if (viewMode === 'compact') {
+    return (
+      <NeuralCard className="h-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BarChart3 className="h-5 w-5 text-neural-cyan" />
+            Market Pulse
+            {isConnected ? (
+              <div className="w-2 h-2 bg-neural-success rounded-full animate-pulse"></div>
+            ) : (
+              <div className="w-2 h-2 bg-neural-warning rounded-full"></div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {/* 主要通貨（上位3つ） */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium neural-title">Top Coins</h4>
+            {marketData.top_coins.slice(0, 3).map((coin) => (
+              <div key={coin.symbol} className="flex items-center justify-between py-2 border-b border-neural-elevated/20 last:border-0">
+                <div className="flex items-center gap-2">
+                  {coin.image ? (
+                    <img 
+                      src={coin.image} 
+                      alt={coin.name}
+                      className="w-4 h-4 rounded-full"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                        const fallback = target.nextElementSibling as HTMLElement
+                        if (fallback) fallback.style.display = 'flex'
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className="w-4 h-4 rounded-full bg-neural-elevated flex items-center justify-center" 
+                    style={{display: coin.image ? 'none' : 'flex'}}
+                  >
+                    <span className="text-xs font-bold">{coin.symbol.slice(0, 2)}</span>
+                  </div>
+                  <span className="text-sm neural-title">{coin.symbol}</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium neural-title">{formatPrice(coin.price)}</div>
+                  <div className={cn("flex items-center gap-1 text-xs", getPriceChangeColor(coin.change24h))}>
+                    {getPriceChangeIcon(coin.change24h)}
+                    {coin.change24h > 0 ? '+' : ''}{coin.change24h.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 市場概況 */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium neural-title">Market Overview</h4>
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-neural-text-secondary">Market Cap</span>
+                <span className="neural-title">${marketData.totalMarketCap.toFixed(2)}T</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-neural-text-secondary">BTC Dominance</span>
+                <span className="neural-title">{marketData.btcDominance.toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-neural-text-secondary">Fear & Greed</span>
+                <span className="neural-title">{marketData.fear_greed_index}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 重要アラート */}
+          {marketData.alerts.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium neural-title flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-neural-warning" />
+                Alerts ({marketData.alerts.length})
+              </h4>
+              <div className="space-y-1">
+                {marketData.alerts.slice(0, 2).map((alert) => (
+                  <div key={alert.id} className={cn("p-2 rounded text-xs", getUrgencyBg(alert.urgency))}>
+                    <div className="flex items-center gap-1 mb-1">
+                      <Badge className="text-xs">{alert.coin}</Badge>
+                      <span className={getPriceChangeColor(alert.change)}>
+                        {alert.change > 0 ? '+' : ''}{alert.change.toFixed(1)}%
+                      </span>
+                    </div>
+                    <p className="leading-tight">{alert.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 更新時刻 */}
+          <div className="text-xs text-neural-text-muted text-center pt-2 border-t border-neural-elevated/20">
+            Last Updated: {marketData && new Date(marketData.lastUpdate).toLocaleTimeString('en-US')}
+          </div>
+        </CardContent>
+      </NeuralCard>
+    )
+  }
+
+  // フルモードのレンダリング
   return (
     <NeuralCard className="h-full">
       <CardHeader className="pb-4">

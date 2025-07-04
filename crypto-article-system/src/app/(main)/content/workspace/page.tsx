@@ -106,7 +106,7 @@ function WorkspaceContent() {
       
     } catch (error) {
       console.error('Auto-generation failed:', error)
-      toast.error(記事生成に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`)
+      toast.error(`記事生成に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`)
     } finally {
       setIsGenerating(false)
     }

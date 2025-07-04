@@ -31,16 +31,19 @@ import {
 // マーケット情報駆動型ナビゲーション構造
 const NEURAL_NAVIGATION = [
   {
+    id: 'workbench',
+    label: 'Workbench',
+    icon: Sparkles,
+    href: '/workbench',
+    description: 'Unified article creation workspace',
+    highlight: true // 新機能として強調
+  },
+  {
     id: 'market',
     label: 'Market',
     icon: BarChart3,
     href: '/market',
-    description: 'Market monitoring and discovery',
-    children: [
-      { id: 'overview', label: 'Overview', icon: Eye, href: '/market' },
-      { id: 'news', label: 'News Feed', icon: Activity, href: '/market/news' },
-      { id: 'alerts', label: 'Price Alerts', icon: AlertTriangle, href: '/market/alerts' }
-    ]
+    description: 'Market monitoring and discovery'
   },
   {
     id: 'content',
@@ -93,6 +96,7 @@ export function NeuralLayout({ children, currentPath }: NeuralLayoutProps) {
   
   // 現在のパスから適切なセクションを決定
   const getActiveSection = () => {
+    if (pathname?.startsWith('/workbench')) return 'workbench'
     if (pathname?.startsWith('/market')) return 'market'
     if (pathname?.startsWith('/content')) return 'content'
     if (pathname?.startsWith('/analytics')) return 'analytics'
@@ -135,13 +139,21 @@ export function NeuralLayout({ children, currentPath }: NeuralLayoutProps) {
                 className={cn(
                   "w-full justify-start h-12 neural-transition",
                   isCollapsed ? "px-3" : "px-4",
-                  activeSection === item.id && "neural-gradient-primary text-white"
+                  activeSection === item.id && "neural-gradient-primary text-white",
+                  item.highlight && "ring-2 ring-neural-cyan/30 shadow-lg"
                 )}
               >
                 <item.icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
                 {!isCollapsed && (
                   <div className="flex-1 text-left">
-                    <div className="font-medium">{item.label}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{item.label}</span>
+                      {item.highlight && (
+                        <span className="px-2 py-0.5 text-xs bg-neural-cyan text-white rounded-full">
+                          NEW
+                        </span>
+                      )}
+                    </div>
                     {item.description && (
                       <div className="text-xs text-neural-text-muted">{item.description}</div>
                     )}

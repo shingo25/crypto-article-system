@@ -302,19 +302,38 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              <div className="flex items-start space-x-2">
+              <div className="flex items-start space-x-3">
                 <Checkbox
                   id="acceptTerms"
+                  name="acceptTerms"
                   checked={formData.acceptTerms}
-                  onCheckedChange={(checked) => 
-                    setFormData(prev => ({ ...prev, acceptTerms: checked as boolean }))
-                  }
-                  className="mt-1"
+                  onCheckedChange={(checked) => {
+                    const newChecked = checked === true
+                    setFormData(prev => ({ ...prev, acceptTerms: newChecked }))
+                    // エラーをクリア
+                    if (errors.acceptTerms && newChecked) {
+                      setErrors(prev => ({ ...prev, acceptTerms: '' }))
+                    }
+                  }}
+                  className={cn(
+                    "mt-1 flex-shrink-0",
+                    errors.acceptTerms && "ring-2 ring-neural-error"
+                  )}
                 />
-                <div className="grid gap-1.5 leading-none">
+                <div className="grid gap-1.5 leading-none flex-1">
                   <Label
                     htmlFor="acceptTerms"
-                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    className={cn(
+                      "text-sm font-medium leading-relaxed cursor-pointer text-neural-text-primary hover:text-neural-cyan transition-colors",
+                      "peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    )}
+                    onClick={() => {
+                      const newChecked = !formData.acceptTerms
+                      setFormData(prev => ({ ...prev, acceptTerms: newChecked }))
+                      if (errors.acceptTerms && newChecked) {
+                        setErrors(prev => ({ ...prev, acceptTerms: '' }))
+                      }
+                    }}
                   >
                     利用規約とプライバシーポリシーに同意します
                   </Label>

@@ -10,6 +10,19 @@ export interface Topic {
   status: 'active' | 'pending' | 'archived'
   priority: 'urgent' | 'high' | 'medium' | 'low'
   tags: string[]
+  // ハイブリッド型トピック用の追加フィールド
+  type?: 'analysis' | 'question' | 'comparison' | 'standard'
+  question?: string
+  analysisAngles?: string[]
+  suggestedStructure?: string[]
+  primaryData?: {
+    coin: string
+    change24h: number
+    currentPrice: number
+    volume24h: string
+  }
+  source?: string
+  estimatedReadTime?: number
 }
 
 // Article型定義

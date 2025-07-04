@@ -9,7 +9,7 @@ import hashlib
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, Request
+from fastapi import HTTPException, status, Request, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -477,8 +477,8 @@ class AuthService:
 
 # 依存関数
 def get_current_user_from_token(
-    credentials: HTTPAuthorizationCredentials = security,
-    db: Session = next(get_db())
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
 ) -> Optional[User]:
     """JWTトークンから現在のユーザーを取得"""
     if not credentials:
@@ -504,7 +504,7 @@ def get_current_user_from_token(
 
 def get_current_user_from_api_key(
     api_key: Optional[str] = None,
-    db: Session = next(get_db())
+    db: Session = Depends(get_db)
 ) -> Optional[tuple[User, APIKey]]:
     """APIキーから現在のユーザーを取得"""
     if not api_key:
@@ -514,8 +514,8 @@ def get_current_user_from_api_key(
 
 
 def require_authentication(
-    credentials: HTTPAuthorizationCredentials = security,
-    db: Session = next(get_db())
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
 ) -> User:
     """認証必須のエンドポイント用依存関数"""
     if not credentials:
@@ -538,7 +538,7 @@ def require_authentication(
 
 def require_api_key_auth(
     request: Request,
-    db: Session = next(get_db())
+    db: Session = Depends(get_db)
 ) -> tuple[User, APIKey]:
     """APIキー認証必須のエンドポイント用依存関数"""
     api_key = request.headers.get("X-API-Key")

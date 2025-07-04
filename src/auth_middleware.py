@@ -30,6 +30,10 @@ PUBLIC_ENDPOINTS: Set[str] = {
     "/auth/register",
     "/auth/login",
     "/auth/refresh",
+    "/api/topics",           # トピック取得は公開
+    "/api/system/stats",     # システム統計は公開
+    "/api/system/control",   # システム制御は公開
+    "/api/articles",         # 記事一覧は公開（読み取りのみ）
 }
 
 # 認証方式の優先順位
@@ -303,6 +307,23 @@ def get_current_user_from_request(request: Request):
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="認証が必要です"
     )
+
+
+# FastAPIのDepends用関数
+async def get_current_user(request: Request):
+    """現在の認証済みユーザーを取得（Depends用）"""
+    return get_current_user_from_request(request)
+
+
+async def get_current_active_user(request: Request):
+    """現在のアクティブなユーザーを取得"""
+    user = get_current_user_from_request(request)
+    if not hasattr(user, 'is_active') or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ユーザーアカウントが無効化されています"
+        )
+    return user
 
 
 def get_current_api_key_from_request(request: Request):

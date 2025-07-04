@@ -13,13 +13,15 @@ import {
   RotateCcw,
   Settings,
   Brain,
-  Sparkles
+  Sparkles,
+  HelpCircle
 } from 'lucide-react'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { TopicColumn } from './TopicColumn'
 import { GenerationColumn } from './GenerationColumn'
 import { PreviewColumn } from './PreviewColumn'
 import { getActiveProviderInfo } from '@/lib/ai-config'
+import { UserGuide } from '@/components/guidance/UserGuide'
 
 interface WorkspaceLayoutProps {
   className?: string
@@ -83,10 +85,17 @@ export function WorkspaceLayout({
       return column === 'center' ? 'col-span-12' : 'hidden'
     }
     if (isLeftCollapsed) {
-      return column === 'left' ? 'hidden' : column === 'center' ? 'col-span-8' : 'col-span-4'
+      return column === 'left' ? 'hidden' : column === 'center' ? 'col-span-5' : 'col-span-7'
     }
     if (isRightCollapsed) {
-      return column === 'right' ? 'hidden' : column === 'left' ? 'col-span-4' : 'col-span-8'
+      return column === 'right' ? 'hidden' : column === 'left' ? 'col-span-3' : 'col-span-9'
+    }
+
+    // 記事が生成されている場合は、プレビューエリアを広くする
+    if (currentArticle?.content) {
+      if (column === 'left') return 'col-span-3'  // Topics: 25%
+      if (column === 'center') return 'col-span-4' // Generation: 33%
+      if (column === 'right') return 'col-span-5'  // Preview: 42%
     }
 
     return 'col-span-4' // デフォルト: 均等3分割
@@ -186,6 +195,18 @@ export function WorkspaceLayout({
         >
           <Settings className="h-4 w-4" />
         </NeuralButton>
+
+        <UserGuide 
+          trigger={
+            <NeuralButton
+              variant="ghost"
+              size="sm"
+              title="使い方ガイド"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </NeuralButton>
+          }
+        />
       </div>
     </div>
   )
@@ -234,7 +255,7 @@ export function WorkspaceLayout({
             isActive={activeColumn === 'topics'}
             onClick={() => setActiveColumn('topics')}
           />
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
             <TopicColumn />
           </div>
         </div>

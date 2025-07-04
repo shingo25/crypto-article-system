@@ -235,8 +235,8 @@ export class MarketDataAPI {
     if (cached) return cached
 
     try {
-      // タイムアウト付きでAPIを叩く
-      const globalPromise = fetch(`${this.baseUrl}/global`, {
+      // ローカルAPI経由で取得（キャッシュ機能付き）
+      const globalPromise = fetch('/api/market/global', {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -244,41 +244,13 @@ export class MarketDataAPI {
         signal: AbortSignal.timeout(8000) // 8秒タイムアウト
       })
 
-      const fearGreedPromise = fetch('https://api.alternative.me/fng/', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        signal: AbortSignal.timeout(5000) // 5秒タイムアウト
-      }).catch(() => null) // Fear & Greedは失敗してもOK
-
-      const [globalResponse, fearGreedResponse] = await Promise.all([
-        globalPromise,
-        fearGreedPromise
-      ])
+      const globalResponse = await globalPromise
 
       if (!globalResponse.ok) {
-        throw new Error(`Global data API error: ${globalResponse.status}`)
+        throw new Error(`Global market API error: ${globalResponse.status}`)
       }
 
-      const globalData = await globalResponse.json()
-      let fearGreedIndex = Math.round(Math.random() * 30 + 50) // デフォルト値
-
-      // Fear & Greed APIが利用可能な場合
-      if (fearGreedResponse?.ok) {
-        try {
-          const fearGreedData = await fearGreedResponse.json()
-          fearGreedIndex = parseInt(fearGreedData.data[0]?.value || fearGreedIndex)
-        } catch (error) {
-          componentLogger.warn('Fear & Greed指数の取得に失敗', error as Error)
-        }
-      }
-
-      const result = {
-        totalMarketCap: globalData.data.total_market_cap.usd / 1e12, // 兆ドル単位
-        btcDominance: globalData.data.market_cap_percentage.btc,
-        fearGreedIndex
-      }
+      const result = await globalResponse.json()
 
       this.setCache(cacheKey, result)
       componentLogger.info('グローバル市場データを取得', result)

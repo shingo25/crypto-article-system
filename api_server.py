@@ -327,8 +327,7 @@ async def use_template(template_id: int, db: Session = Depends(get_db)):
 @app.get("/api/system/stats")
 @limiter.limit("10/minute")
 async def get_system_stats(
-    request: Request,
-    current_user: User = Depends(get_current_user_from_request)
+    request: Request
 ):
     """システムの統計情報を取得"""
     try:
@@ -389,8 +388,7 @@ async def get_system_stats(
 async def control_system(
     request_data: SystemControlRequest, 
     background_tasks: BackgroundTasks,
-    request: Request,
-    current_user: User = Depends(get_current_user_from_request)
+    request: Request
 ):
     """システムの開始・停止・再起動"""
     try:
@@ -535,7 +533,8 @@ async def get_topics(
                 "onchain_data": "オンチェーンデータ"
             }.get(source_name, source_name)
             
-            topics_data.append({
+            # ハイブリッド型トピックの追加データを含める
+            topic_data = {
                 "id": str(hash(topic.title)),  # 簡易ID
                 "title": topic.title,
                 "priority": topic.priority.name.lower(),
@@ -543,8 +542,41 @@ async def get_topics(
                 "coins": topic.coins,
                 "collectedAt": topic.collected_at.strftime("%Y-%m-%d %H:%M:%S"),
                 "source": source_display,
-                "sourceUrl": topic.source_url
-            })
+                "sourceUrl": topic.source_url,
+                "summary": topic.summary or topic.title  # summaryを追加
+            }
+            
+            # ハイブリッド型トピックの場合、追加データを含める
+            if hasattr(topic, 'data') and topic.data:
+                if topic.data.get('analysis_type') == 'hybrid':
+                    topic_data.update({
+                        "type": "analysis",
+                        "question": topic.data.get('analysis_angle'),
+                        "suggestedStructure": topic.data.get('suggested_structure', []),
+                        "primaryData": {
+                            "coin": topic.coins[0] if topic.coins else "",
+                            "change24h": topic.data.get('change_24h', 0),
+                            "currentPrice": topic.data.get('price', 0),
+                            "volume24h": f"${topic.data.get('volume', 0):,.0f}" if topic.data.get('volume') else ""
+                        },
+                        "estimatedReadTime": 5  # デフォルト読み時間
+                    })
+                else:
+                    # 通常の価格変動トピック
+                    topic_data.update({
+                        "type": "standard",
+                        "primaryData": {
+                            "coin": topic.coins[0] if topic.coins else "",
+                            "change24h": topic.data.get('change_24h', 0),
+                            "currentPrice": topic.data.get('price', 0),
+                            "volume24h": f"${topic.data.get('volume', 0):,.0f}" if topic.data.get('volume') else ""
+                        } if topic.data.get('price') else None
+                    })
+            else:
+                # RSSやその他のトピック
+                topic_data["type"] = "standard"
+            
+            topics_data.append(topic_data)
         
         response_data = {
             "topics": topics_data,

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useCallback, useMemo, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { NeuralCard, CardContent } from '@/components/neural/NeuralCard'
 import { NeuralButton } from '@/components/neural/NeuralButton'
@@ -19,12 +19,13 @@ import {
 import { useTopics } from '@/hooks/useTopics'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { LoadingSkeleton } from '@/components/LoadingSkeleton'
+import { Topic } from '@/lib/types'
 
 interface TopicCardProps {
-  topic: any // useTopicsから取得するTopic型
+  topic: Topic
   isSelected: boolean
-  onSelect: (topic: any) => void
-  onGenerate: (topic: any) => void
+  onSelect: (topic: Topic) => void
+  onGenerate: (topic: Topic) => void
 }
 
 const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGenerate }) => {
@@ -42,10 +43,21 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
     low: '📋'
   }
 
+  // トピックタイプのアイコンと色
+  const typeInfo = {
+    analysis: { icon: '🔍', color: 'text-neural-cyan', label: '分析' },
+    question: { icon: '❓', color: 'text-neural-warning', label: '考察' },
+    comparison: { icon: '⚖️', color: 'text-neural-purple', label: '比較' },
+    standard: { icon: '📰', color: 'text-neural-text-secondary', label: 'ニュース' }
+  }
+  
+  const topicType = topic.type || 'standard'
+  const typeDisplay = typeInfo[topicType] || typeInfo.standard
+
   return (
     <NeuralCard 
       className={cn(
-        "group cursor-pointer neural-transition mb-3 hover:scale-[1.02] hover:shadow-xl",
+        "group cursor-pointer neural-transition hover:scale-[1.02] hover:shadow-xl min-h-[180px]",
         isSelected && "ring-2 ring-neural-cyan shadow-lg shadow-neural-cyan/20 scale-[1.02]"
       )}
       onClick={() => onSelect(topic)}
@@ -53,15 +65,25 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
       <CardContent className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
-          <Badge className={cn("text-white border-0 text-xs px-2 py-0.5", priorityColors[topic.priority] || 'neural-gradient-primary')}>
-            <span className="mr-1 text-sm">{priorityIcons[topic.priority] || '💡'}</span>
-            {topic.priority?.toUpperCase() || 'MEDIUM'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={cn("text-white border-0 text-xs px-2 py-0.5", priorityColors[topic.priority] || 'neural-gradient-primary')}>
+              <span className="mr-1 text-sm">{priorityIcons[topic.priority] || '💡'}</span>
+              {topic.priority?.toUpperCase() || 'MEDIUM'}
+            </Badge>
+            
+            {/* トピックタイプバッジ */}
+            <div className={cn("flex items-center gap-1 px-2 py-1 bg-neural-elevated/30 rounded-full", typeDisplay.color)}>
+              <span className="text-xs">{typeDisplay.icon}</span>
+              <span className="text-xs font-medium">{typeDisplay.label}</span>
+            </div>
+          </div>
           
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 px-2 py-1 bg-neural-elevated/30 rounded-full">
               <Target className="h-3 w-3 text-neural-cyan" />
-              <span className="text-neural-cyan font-semibold text-xs">90</span>
+              <span className="text-neural-cyan font-semibold text-xs">
+                {topic.score ? Math.round(topic.score) : 90}
+              </span>
             </div>
             
             <NeuralButton
@@ -79,6 +101,50 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
           {topic.summary}
         </h3>
 
+        {/* 価格データ（分析トピックの場合） */}
+        {topic.primaryData && (
+          <div className="mb-3 p-2 bg-neural-elevated/20 rounded-lg">
+            {topic.primaryData.change24h !== undefined && topic.primaryData.change24h !== null && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-neural-text-secondary">価格変動</span>
+                <span className={cn(
+                  "font-semibold",
+                  topic.primaryData.change24h > 0 ? "text-neural-success" : "text-neural-error"
+                )}>
+                  {topic.primaryData.change24h > 0 ? '+' : ''}{topic.primaryData.change24h.toFixed(1)}%
+                </span>
+              </div>
+            )}
+            {topic.primaryData.currentPrice && (
+              <div className={cn(
+                "flex items-center justify-between text-xs",
+                topic.primaryData.change24h !== undefined ? "mt-1" : ""
+              )}>
+                <span className="text-neural-text-secondary">現在価格</span>
+                <span className="font-medium">
+                  ${typeof topic.primaryData.currentPrice === 'number' 
+                    ? topic.primaryData.currentPrice.toLocaleString() 
+                    : topic.primaryData.currentPrice}
+                </span>
+              </div>
+            )}
+            {topic.primaryData.volume24h && (
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-neural-text-secondary">24h取引高</span>
+                <span className="font-medium text-xs">
+                  {topic.primaryData.volume24h}
+                </span>
+              </div>
+            )}
+            {topic.primaryData.marketCapRank && (
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-neural-text-secondary">時価総額ランク</span>
+                <span className="font-medium">#{topic.primaryData.marketCapRank}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Coins */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {topic.coins?.slice(0, 3).map((coin: string) => (
@@ -86,7 +152,12 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
               key={coin} 
               className="flex items-center gap-1 px-2.5 py-1 bg-neural-surface/80 rounded-full border border-neural-elevated/50 hover:border-neural-cyan/50 transition-colors"
             >
-              <TrendingUp className="h-3 w-3 text-neural-success" />
+              <TrendingUp className={cn(
+                "h-3 w-3",
+                topic.primaryData?.change24h !== undefined 
+                  ? topic.primaryData.change24h > 0 ? "text-neural-success" : "text-neural-error"
+                  : "text-neural-success"
+              )} />
               <span className="text-neural-text-secondary text-xs font-medium">{coin}</span>
             </div>
           ))}
@@ -107,7 +178,14 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
             })}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {/* 予想読み時間 */}
+            {topic.estimatedReadTime && (
+              <div className="flex items-center gap-1 text-xs text-neural-text-muted">
+                <Clock className="h-3 w-3" />
+                <span>約{topic.estimatedReadTime}分</span>
+              </div>
+            )}
             
             <NeuralButton
               size="sm"
@@ -119,7 +197,7 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, isSelected, onSelect, onGe
               }}
             >
               <Sparkles className="h-3 w-3 mr-1" />
-              記事生成
+              {topic.type === 'analysis' ? '分析記事生成' : '記事生成'}
             </NeuralButton>
           </div>
         </div>
@@ -141,8 +219,8 @@ export function TopicColumn() {
   const [searchQuery, setSearchQuery] = React.useState('')
 
   // フィルタリングされたトピック
-  const filteredTopics = React.useMemo(() => {
-    return topics.filter(topic => {
+  const filteredTopics = useMemo(() => {
+    const filtered = topics.filter(topic => {
       const matchesSearch = !searchQuery || 
         topic.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         topic.coins?.some((coin: string) => coin.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -151,19 +229,22 @@ export function TopicColumn() {
 
       return matchesSearch && matchesPriority
     })
+    
+    
+    return filtered
   }, [topics, searchQuery, topicFilter])
 
-  const handleTopicSelect = (topic: any) => {
+  const handleTopicSelect = useCallback((topic: Topic) => {
     selectTopic(topic)
-  }
+  }, [selectTopic])
 
-  const handleGenerate = async (topic: any) => {
+  const handleGenerate = useCallback(async (topic: Topic) => {
     selectTopic(topic)
     await startGeneration()
-  }
+  }, [selectTopic, startGeneration])
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Search & Filters */}
       <div className="p-4 space-y-3 border-b border-neural-elevated/20">
         {/* Search */}
@@ -195,7 +276,7 @@ export function TopicColumn() {
               size="sm"
               className="text-xs"
               onClick={() => setTopicFilter(
-                topicFilter === priority ? 'all' : priority as any
+                topicFilter === priority ? 'all' : priority as 'urgent' | 'high' | 'medium' | 'low'
               )}
             >
               {priority}
@@ -205,7 +286,13 @@ export function TopicColumn() {
       </div>
 
       {/* Topics List */}
-      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-neural-elevated/30 scrollbar-track-transparent">
+      <div 
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 scrollbar-thin scrollbar-thumb-neural-elevated/30 scrollbar-track-transparent hover:scrollbar-thumb-neural-elevated/50" 
+        style={{
+          maxHeight: 'calc(100vh - 300px)',
+          overscrollBehavior: 'contain'
+        }}
+      >
         {isLoading && filteredTopics.length === 0 ? (
           <LoadingSkeleton count={5} className="space-y-4" />
         ) : filteredTopics.length === 0 ? (
@@ -217,7 +304,7 @@ export function TopicColumn() {
             </div>
           </div>
         ) : (
-          <>
+          <div className="space-y-4">
             {filteredTopics.map((topic) => (
               <TopicCard
                 key={topic.id}
@@ -239,7 +326,7 @@ export function TopicColumn() {
                 </NeuralButton>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

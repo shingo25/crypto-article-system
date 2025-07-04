@@ -10,6 +10,11 @@ const logger = createLogger('AppInitializer')
 
 let isInitialized = false
 
+// EventEmitter の最大リスナー数を増加してメモリリーク警告を回避
+if (typeof process !== 'undefined') {
+  process.setMaxListeners(20)
+}
+
 /**
  * アプリケーション初期化
  * サーバー起動時に一度だけ実行される

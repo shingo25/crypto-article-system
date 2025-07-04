@@ -55,7 +55,7 @@ async def register_user(
             full_name=user_data.full_name
         )
         
-        return UserProfile(
+        return UserResponse(
             id=user.id,
             email=user.email,
             full_name=user.full_name,
@@ -224,12 +224,12 @@ async def logout_user(
 
 
 # プロフィール取得エンドポイント
-@router.get("/profile", response_model=UserProfile)
+@router.get("/profile", response_model=UserResponse)
 async def get_user_profile(
     current_user: User = Depends(require_authentication)
 ):
     """現在のユーザープロフィールを取得"""
-    return UserProfile(
+    return UserResponse(
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
@@ -245,7 +245,7 @@ async def get_user_profile(
 @limiter.limit("5/hour")  # 1時間に5回まで
 async def create_api_key(
     request: Request,
-    api_key_data: APIKeyCreate,
+    api_key_data: APIKeyCreateSchema,
     current_user: User = Depends(require_authentication),
     db: Session = Depends(get_db)
 ):

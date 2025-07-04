@@ -18,6 +18,7 @@ export interface AuthTokens {
   refresh_token: string
   token_type: string
   expires_in: number
+  user?: User
 }
 
 export interface LoginCredentials {
@@ -116,21 +117,21 @@ class AuthAPI {
   }
   
   async login(credentials: LoginCredentials): Promise<AuthTokens> {
-    return this.request<AuthTokens>('/auth/login', {
+    return this.request<AuthTokens>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
   }
   
   async register(data: RegisterData): Promise<User> {
-    return this.request<User>('/auth/register', {
+    return this.request<User>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
   
   async logout(token: string): Promise<void> {
-    await this.request('/auth/logout', {
+    await this.request('/api/auth/logout', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -139,14 +140,14 @@ class AuthAPI {
   }
   
   async refreshToken(refreshToken: string): Promise<AuthTokens> {
-    return this.request<AuthTokens>('/auth/refresh', {
+    return this.request<AuthTokens>('/api/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   }
   
   async getUserProfile(token: string): Promise<User> {
-    return this.request<User>('/auth/profile', {
+    return this.request<User>('/api/auth/profile', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -160,7 +161,7 @@ class AuthAPI {
     permissions?: string[], 
     expires_days?: number
   ): Promise<{ api_key: string; key_id: number; key_name: string; warning: string }> {
-    return this.request('/auth/api-keys', {
+    return this.request('/api/auth/api-keys', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -174,7 +175,7 @@ class AuthAPI {
   }
   
   async getAPIKeys(token: string): Promise<APIKey[]> {
-    return this.request<APIKey[]>('/auth/api-keys', {
+    return this.request<APIKey[]>('/api/auth/api-keys', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -183,7 +184,7 @@ class AuthAPI {
   }
   
   async revokeAPIKey(token: string, keyId: number): Promise<void> {
-    await this.request(`/auth/api-keys/${keyId}`, {
+    await this.request(`/api/auth/api-keys/${keyId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -210,10 +211,16 @@ export const useAuthStore = create<AuthState>()(
           
           try {
             const api = AuthAPI.getInstance()
-            const tokens = await api.login({ email, password })
+            const response = await api.login({ email, password })
             
-            // ユーザープロフィールを取得
-            const user = await api.getUserProfile(tokens.access_token)
+            // レスポンスに含まれるユーザー情報を使用
+            const user = response.user
+            const tokens = {
+              access_token: response.access_token,
+              refresh_token: response.refresh_token,
+              token_type: response.token_type,
+              expires_in: response.expires_in
+            }
             
             set({
               user,

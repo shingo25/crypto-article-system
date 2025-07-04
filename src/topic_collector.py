@@ -234,6 +234,16 @@ class PriceDataCollector:
         
         # 代替として無料のCoinGecko APIを使用
         self.coingecko_url = 'https://api.coingecko.com/api/v3'
+        
+        # ハイブリッド型トピック用の分析テーマ（問いかけ）
+        self.analysis_angles = [
+            "なぜ価格は{direction}したのか？考えられる3つの要因",
+            "今後の価格はどうなる？テクニカル分析と市場心理",
+            "専門家の意見まとめ：{symbol}は今が買い時か？",
+            "この{direction}は続く？オンチェーンデータから読み解く",
+            "クジラ（大口投資家）の動き：{symbol}の大量取引はあったか？",
+            "{symbol}の{direction}が他の暗号通貨に与える影響とは？"
+        ]
     
     def collect(self) -> List[CollectedTopic]:
         """価格変動からトピックを生成"""
@@ -245,9 +255,14 @@ class PriceDataCollector:
             
             # 大きな価格変動をトピック化
             for mover in price_movers:
+                # 1. 既存の価格変動トピックを生成
                 topic = self._create_price_topic(mover)
                 if topic:
                     topics.append(topic)
+                
+                # 2. ハイブリッド型（分析・問いかけ）トピックを生成
+                hybrid_topics = self._create_hybrid_topics(mover)
+                topics.extend(hybrid_topics)
             
             # トレンドコインを取得
             trending = self._get_trending_coins()
@@ -390,6 +405,79 @@ class PriceDataCollector:
             data={'market_cap_rank': coin.get('market_cap_rank', 0), 'coin_id': coin_id},
             score=50  # トレンド入りは高スコア
         )
+    
+    def _create_hybrid_topics(self, mover: Dict) -> List[CollectedTopic]:
+        """価格変動データと分析テーマを組み合わせてハイブリッドトピックを生成"""
+        hybrid_topics = []
+        change = mover['change_24h']
+        direction = "急騰" if change > 0 else "急落"
+        
+        # 分析テーマを選択（変動率によって数を調整）
+        num_angles = 3 if abs(change) >= 15 else 2  # 大きな変動ほど多くの角度
+        selected_angles = self.analysis_angles[:num_angles]
+        
+        for angle_template in selected_angles:
+            # タイトルを生成
+            analysis_title = angle_template.format(
+                symbol=mover['symbol'],
+                direction=direction
+            )
+            
+            # プレフィックスを追加して、元のコイン名と変動率を明確にする
+            full_title = f"{mover['name']}が{abs(change):.1f}%{direction}：{analysis_title}"
+            
+            # 優先度は元の価格変動に連動させる
+            if abs(change) >= 20:
+                priority = TopicPriority.URGENT
+            elif abs(change) >= 15:
+                priority = TopicPriority.HIGH
+            else:
+                priority = TopicPriority.MEDIUM
+            
+            # キーワードを追加（分析系のキーワードを強化）
+            keywords = [
+                "分析", "考察", "見通し", "要因", mover['name'], mover['symbol'],
+                "テクニカル分析", "ファンダメンタルズ", "市場心理"
+            ]
+            if direction == "急騰":
+                keywords.extend(["上昇要因", "bullish", "買い時"])
+            else:
+                keywords.extend(["下落要因", "bearish", "リスク"])
+            
+            # CoinGeckoの詳細ページURLを生成
+            coin_id = mover.get('id', mover['name'].lower().replace(' ', '-'))
+            source_url = f"https://www.coingecko.com/ja/coins/{coin_id}"
+            
+            # 分析フレームワークを提案
+            if "3つの要因" in analysis_title:
+                suggested_structure = ["価格変動の概要", "技術的要因", "ファンダメンタル要因", "市場心理的要因", "今後の展望"]
+            elif "テクニカル分析" in analysis_title:
+                suggested_structure = ["現在の価格状況", "チャート分析", "サポート・レジスタンス", "予想シナリオ"]
+            elif "買い時" in analysis_title:
+                suggested_structure = ["現在の投資環境", "専門家の見解", "リスク要因", "投資判断のポイント"]
+            else:
+                suggested_structure = ["背景説明", "詳細分析", "今後の見通し"]
+            
+            topic = CollectedTopic(
+                title=full_title,
+                source=TopicSource.PRICE_API,  # ソースはPRICE_APIのまま
+                source_url=source_url,
+                priority=priority,
+                coins=[mover['symbol']],
+                keywords=keywords,
+                summary=f"{mover['name']}の{direction}（{change:+.1f}%）について、{analysis_title.lower()}。データに基づいた詳細な分析記事の執筆が推奨されます。",
+                collected_at=datetime.datetime.now(),
+                data={
+                    **mover,  # 元の価格データを保持
+                    'analysis_type': 'hybrid',
+                    'suggested_structure': suggested_structure,
+                    'analysis_angle': analysis_title
+                },
+                score=abs(change) * 0.9  # 分析系は少しスコアを調整（0.9倍）
+            )
+            hybrid_topics.append(topic)
+        
+        return hybrid_topics
 
 
 class TopicManager:

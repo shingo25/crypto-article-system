@@ -75,18 +75,38 @@ function WorkspaceContent() {
     setIsGenerating(true)
     
     try {
-      // 自動生成のロジック（実際のAPIコールに置き換え）
+      // 実際の記事生成APIを呼び出し
       toast.success(`「${context.topic}」の自動生成を開始しました`)
       
-      // シミュレーション用のタイマー
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // 生成完了後の処理
-      toast.success('記事の草稿が生成されました')
+      const response = await fetch('/api/articles/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_type: context.source === 'news' ? 'news' : 'topic',
+          source_content: context.topic,
+          topic: context.topic,
+          ai_provider: 'gemini',
+          style: 'detailed',
+          length: 'medium'
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // 生成成功時の処理
+        toast.success('記事の草稿が生成されました')
+        console.log('Generated article:', data.data.article)
+        // TODO: 生成された記事をワークスペースに表示
+      } else {
+        throw new Error(data.error || '記事生成に失敗しました')
+      }
       
     } catch (error) {
       console.error('Auto-generation failed:', error)
-      toast.error('自動生成に失敗しました')
+      toast.error(記事生成に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`)
     } finally {
       setIsGenerating(false)
     }

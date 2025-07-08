@@ -53,36 +53,11 @@ const nextConfig = {
   // ページ設定
   pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
   
-  // セキュリティヘッダー
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY'
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin'
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()'
-          }
-        ]
-      }
-    ]
-  },
+  // セキュリティヘッダーはmiddleware.tsで一元管理
+  // async headers() {
+  //   // middleware.tsと競合するため無効化
+  //   return []
+  // },
 
   // 実験的機能
   experimental: {

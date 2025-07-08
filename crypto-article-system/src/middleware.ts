@@ -1,52 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkIPRateLimit } from '@/lib/redis-rate-limit'
+
+// Edge Runtime対応のレート制限
+async function checkRateLimitSafely(ip: string, windowMs: number, maxRequests: number): Promise<{ allowed: boolean; remaining?: number; resetTime?: number }> {
+  try {
+    // 本番環境ではRedisを使用
+    if (process.env.NODE_ENV === 'production' && process.env.REDIS_URL) {
+      const { checkIPRateLimit } = await import('@/lib/redis-rate-limit')
+      const result = await checkIPRateLimit(ip, windowMs, maxRequests)
+      return {
+        allowed: result.allowed,
+        remaining: result.remainingRequests,
+        resetTime: result.resetTime
+      }
+    } else {
+      // 開発環境またはRedis未設定時はEdge Runtime対応版を使用
+      const { checkEdgeIPRateLimit } = await import('@/lib/redis-rate-limit-edge')
+      const result = await checkEdgeIPRateLimit(ip, windowMs, maxRequests)
+      return {
+        allowed: result.allowed,
+        remaining: result.remainingRequests,
+        resetTime: result.resetTime
+      }
+    }
+  } catch (error) {
+    console.warn('Rate limit check failed, allowing request:', error)
+    return { allowed: true }
+  }
+}
 
 // フォールバック用のメモリベースレート制限（Redis接続失敗時）
 const FALLBACK_RATE_LIMIT_MAP = new Map<string, { count: number; lastReset: number }>()
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000 // 15分
 const RATE_LIMIT_MAX_REQUESTS = 100 // 15分間に100リクエスト
 
-function checkFallbackRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const userLimit = FALLBACK_RATE_LIMIT_MAP.get(ip)
-  
-  if (!userLimit) {
-    FALLBACK_RATE_LIMIT_MAP.set(ip, { count: 1, lastReset: now })
-    return true
-  }
-  
-  // リセット時間を過ぎている場合
-  if (now - userLimit.lastReset > RATE_LIMIT_WINDOW) {
-    FALLBACK_RATE_LIMIT_MAP.set(ip, { count: 1, lastReset: now })
-    return true
-  }
-  
-  // リクエスト数をチェック
-  if (userLimit.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false
-  }
-  
-  // カウントを増加
-  userLimit.count++
-  return true
-}
+// checkFallbackRateLimit は checkRateLimitSafely に統合されたため削除
 
 async function checkRateLimit(ip: string): Promise<{ allowed: boolean; remaining?: number; resetTime?: number }> {
-  try {
-    // Redis-based レート制限を試行
-    const result = await checkIPRateLimit(ip, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_REQUESTS)
-    return {
-      allowed: result.allowed,
-      remaining: result.remainingRequests,
-      resetTime: result.resetTime
-    }
-  } catch (error) {
-    console.warn('Redis rate limit failed, using fallback:', error)
-    // フォールバック
-    return {
-      allowed: checkFallbackRateLimit(ip)
-    }
-  }
+  return checkRateLimitSafely(ip, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_REQUESTS)
 }
 
 function getClientIP(request: NextRequest): string {
@@ -149,7 +139,7 @@ export async function middleware(request: NextRequest) {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
   }
   
-  // Permissions Policy（機能制限）
+  // Chrome拡張機能ブロック用のPermissions Policy強化
   response.headers.set('Permissions-Policy', [
     'camera=()',
     'microphone=()',
@@ -160,7 +150,13 @@ export async function middleware(request: NextRequest) {
     'bluetooth=()',
     'magnetometer=()',
     'gyroscope=()',
-    'accelerometer=()'
+    'accelerometer=()',
+    'ambient-light-sensor=()',
+    'autoplay=()',
+    'encrypted-media=()',
+    'fullscreen=()',
+    'picture-in-picture=()',
+    'web-share=()'
   ].join(', '))
   
   // CSPヘッダーを設定（セキュリティ強化）
@@ -168,6 +164,7 @@ export async function middleware(request: NextRequest) {
   const cspHeader = [
     "default-src 'self'",
     // スクリプト: Next.js とアプリケーションに必要なもの（nonce-based）
+    // Chrome拡張機能のスクリプト実行を明示的にブロック
     isDevelopment 
       ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval' localhost:* ws:` 
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
@@ -177,13 +174,13 @@ export async function middleware(request: NextRequest) {
     "img-src 'self' data: https: blob:",
     // フォント: Google Fonts
     "font-src 'self' https://fonts.gstatic.com",
-    // 接続: API とWebSocket
+    // 接続: API とWebSocket（chrome-extension:// を明示的に除外）
     isDevelopment
       ? "connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com"
       : "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
     // メディア
     "media-src 'self'",
-    // オブジェクト: 完全に無効化
+    // オブジェクト: 完全に無効化（プラグインブロック）
     "object-src 'none'",
     // 子フレーム: 同一オリジンのみ
     "child-src 'self'",
@@ -193,6 +190,10 @@ export async function middleware(request: NextRequest) {
     "form-action 'self'",
     // ベースURI: 同一オリジンのみ
     "base-uri 'self'",
+    // Worker: 同一オリジンのみ
+    "worker-src 'self'",
+    // Manifest: 同一オリジンのみ
+    "manifest-src 'self'",
     // アップグレード: 本番環境ではHTTPSを強制
     ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
     // CSP違反レポート

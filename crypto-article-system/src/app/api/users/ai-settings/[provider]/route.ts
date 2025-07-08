@@ -5,6 +5,9 @@ import { maskApiKey } from '@/lib/encryption'
 import { protectCSRF } from '@/lib/csrf-middleware'
 import { z } from 'zod'
 
+// Node.js Runtime を明示的に指定（Redis/暗号化のため）
+export const runtime = 'nodejs'
+
 const providerSchema = z.enum(['OPENAI', 'CLAUDE', 'GEMINI'])
 
 // GET /api/users/ai-settings/[provider] - 特定のプロバイダーの設定を取得

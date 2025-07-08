@@ -6,6 +6,9 @@ import { maskApiKey } from '@/lib/encryption'
 import { protectCSRF } from '@/lib/csrf-middleware'
 import { z } from 'zod'
 
+// Node.js Runtime を明示的に指定（Redis/暗号化のため）
+export const runtime = 'nodejs'
+
 // GET /api/users/ai-settings - 現在のユーザーの全AI設定を取得
 export async function GET(request: NextRequest) {
   return requireAuth(async (req, user) => {

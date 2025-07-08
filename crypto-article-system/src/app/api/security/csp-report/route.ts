@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Node.js Runtime を明示的に指定（セキュリティ処理のため）
+export const runtime = 'nodejs'
+
 interface CSPViolationReport {
   'csp-report': {
     'document-uri': string

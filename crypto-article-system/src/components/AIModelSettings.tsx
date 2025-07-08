@@ -3,6 +3,15 @@
 import { useState, useEffect } from 'react'
 import { useOptionalAuth } from '@/components/auth/AuthProvider'
 import { requireAuthForSave } from '@/lib/auth-helpers'
+import { 
+  fetchAiSettings, 
+  saveAiSetting, 
+  deleteAiSetting, 
+  convertProviderToApi, 
+  convertProviderFromApi,
+  AIProviderSetting,
+  AIProviderSettingInput 
+} from '@/lib/ai-api-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -108,9 +117,11 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [savedConfigs, setSavedConfigs] = useState<Record<string, any>>({})
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedConfigs, setSavedConfigs] = useState<Record<string, AIProviderSetting>>({})
   const [currentStep, setCurrentStep] = useState(1)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [presets, setPresets] = useState({
@@ -126,26 +137,23 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
     const models = Object.keys(AI_PROVIDERS[provider].models)
     
     // プロバイダー変更時は保存済み設定があれば読み込み、なければAPIキーをリセット
-    const configKey = `ai_config_${provider}`
-    const savedConfig = localStorage.getItem(configKey)
+    const savedSetting = savedConfigs[provider]
     
-    if (savedConfig) {
-      try {
-        const parsed = JSON.parse(savedConfig)
-        setConfig(parsed)
-        setTestResult({
-          success: true,
-          message: `${AI_PROVIDERS[provider].name} の保存済み設定を読み込みました`
-        })
-      } catch (error) {
-        // 保存済み設定の読み込みに失敗した場合は新規設定
-        setConfig(prev => ({
-          ...prev,
-          provider,
-          model: models[0],
-          apiKey: '' // APIキーはリセット
-        }))
-      }
+    if (savedSetting) {
+      setConfig({
+        provider,
+        model: savedSetting.model,
+        apiKey: savedSetting.apiKey, // マスクされた値
+        temperature: savedSetting.temperature,
+        max_tokens: savedSetting.maxTokens,
+        top_p: savedSetting.topP,
+        frequency_penalty: savedSetting.frequencyPenalty,
+        presence_penalty: savedSetting.presencePenalty
+      })
+      setTestResult({
+        success: true,
+        message: `${AI_PROVIDERS[provider].name} の保存済み設定を読み込みました`
+      })
     } else {
       // 保存済み設定がない場合は新規設定
       setConfig(prev => ({
@@ -154,6 +162,7 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
         model: models[0],
         apiKey: '' // APIキーはリセット
       }))
+      setTestResult(null)
     }
   }
 
@@ -200,15 +209,34 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
       return
     }
 
-    setSaving(true)
+    setIsSaving(true)
+    setError(null)
+    
     try {
-      // 各プロバイダー別に設定を保存
-      const configKey = `ai_config_${config.provider}`
-      localStorage.setItem(configKey, JSON.stringify(config))
-      localStorage.setItem('ai_config', JSON.stringify(config)) // 現在の設定も保存
+      // API設定をサーバーに保存
+      const settingInput: AIProviderSettingInput = {
+        provider: convertProviderToApi(config.provider),
+        model: config.model,
+        apiKey: config.apiKey,
+        temperature: config.temperature,
+        maxTokens: config.max_tokens,
+        topP: config.top_p,
+        frequencyPenalty: config.frequency_penalty,
+        presencePenalty: config.presence_penalty,
+        isDefault: false,
+        isActive: true
+      }
+      
+      const savedSetting = await saveAiSetting(settingInput)
       
       // 保存済み設定リストを更新
-      loadSavedConfigs()
+      await loadSavedConfigs()
+      
+      // 現在の設定にマスクされたAPIキーを反映
+      setConfig(prev => ({
+        ...prev,
+        apiKey: savedSetting.apiKey // マスクされた値
+      }))
       
       onSave?.(config)
       setTestResult({
@@ -216,12 +244,14 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
         message: '設定が正常に保存されました'
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '設定の保存に失敗しました'
+      setError(errorMessage)
       setTestResult({
         success: false,
-        message: '設定の保存に失敗しました'
+        message: errorMessage
       })
     } finally {
-      setSaving(false)
+      setIsSaving(false)
     }
   }
 
@@ -235,85 +265,88 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
       return
     }
 
-    setDeleting(true)
+    setIsDeleting(true)
+    setError(null)
+    
     try {
-      // 現在のプロバイダーの設定をリセット
+      // サーバーから設定を削除
+      const apiProvider = convertProviderToApi(config.provider)
+      await deleteAiSetting(apiProvider)
+      
+      // 現在の設定をリセット
       setConfig(prev => ({
         ...prev,
         apiKey: ''
       }))
 
-      // ローカルストレージから削除
-      const configKey = `ai_config_${config.provider}`
-      localStorage.removeItem(configKey)
-      
-      const savedConfig = localStorage.getItem('ai_config')
-      if (savedConfig) {
-        const parsed = JSON.parse(savedConfig)
-        if (parsed.provider === config.provider) {
-          localStorage.removeItem('ai_config')
-        }
-      }
-
       // 保存済み設定リストを更新
-      loadSavedConfigs()
+      await loadSavedConfigs()
 
       setTestResult({
         success: true,
         message: `${currentProvider.name} の設定を削除しました`
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '設定の削除に失敗しました'
+      setError(errorMessage)
       setTestResult({
         success: false,
-        message: '設定の削除に失敗しました'
+        message: errorMessage
       })
     } finally {
-      setDeleting(false)
+      setIsDeleting(false)
     }
   }
 
   // 保存済み設定を読み込む
-  const loadSavedConfigs = () => {
-    const configs: Record<string, any> = {}
-    Object.keys(AI_PROVIDERS).forEach(provider => {
-      const configKey = `ai_config_${provider}`
-      const savedConfig = localStorage.getItem(configKey)
-      if (savedConfig) {
-        try {
-          const parsed = JSON.parse(savedConfig)
-          if (parsed.apiKey) {
-            configs[provider] = {
-              ...parsed,
-              apiKey: parsed.apiKey.substring(0, 8) + '...' // APIキーの最初の8文字のみ表示
-            }
-          }
-        } catch (error) {
-          console.error(`Failed to parse config for ${provider}:`, error)
-        }
-      }
-    })
-    setSavedConfigs(configs)
+  const loadSavedConfigs = async () => {
+    if (!isAuthenticated) return
+    
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      const settings = await fetchAiSettings()
+      const configs: Record<string, AIProviderSetting> = {}
+      
+      settings.forEach(setting => {
+        const uiProvider = convertProviderFromApi(setting.provider)
+        configs[uiProvider] = setting
+      })
+      
+      setSavedConfigs(configs)
+    } catch (error) {
+      console.error('Failed to load AI settings:', error)
+      setError(error instanceof Error ? error.message : 'AI設定の読み込みに失敗しました')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // 保存済み設定を読み込んで現在の設定に適用
   const loadConfigFromProvider = (provider: keyof typeof AI_PROVIDERS) => {
-    const configKey = `ai_config_${provider}`
-    const savedConfig = localStorage.getItem(configKey)
-    if (savedConfig) {
-      try {
-        const parsed = JSON.parse(savedConfig)
-        setConfig(parsed)
-        setCurrentStep(3) // 設定完了ステップに移動
-        setTestResult({
-          success: true,
-          message: `${AI_PROVIDERS[provider].name} の設定を読み込みました`
-        })
-      } catch (error) {
-        setTestResult({
-          success: false,
-          message: '設定の読み込みに失敗しました'
-        })
-      }
+    const savedSetting = savedConfigs[provider]
+    if (savedSetting) {
+      setConfig({
+        provider,
+        model: savedSetting.model,
+        apiKey: savedSetting.apiKey, // マスクされた値
+        temperature: savedSetting.temperature,
+        max_tokens: savedSetting.maxTokens,
+        top_p: savedSetting.topP,
+        frequency_penalty: savedSetting.frequencyPenalty,
+        presence_penalty: savedSetting.presencePenalty
+      })
+      setCurrentStep(3) // 設定完了ステップに移動
+      setTestResult({
+        success: true,
+        message: `${AI_PROVIDERS[provider].name} の設定を読み込みました`
+      })
+    } else {
+      setTestResult({
+        success: false,
+        message: '保存済み設定が見つかりません'
+      })
     }
   }
 
@@ -342,16 +375,15 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
   useEffect(() => {
     if (isAuthenticated) {
       // ログイン時は保存済み設定を読み込み
-      try {
-        const savedConfig = localStorage.getItem('ai_config')
-        if (savedConfig) {
-          const parsed = JSON.parse(savedConfig)
-          setConfig(prev => ({ ...prev, ...parsed }))
-        }
-        // 保存済み設定も読み込み
-        loadSavedConfigs()
-      } catch (error) {
-        console.error('設定の読み込みに失敗:', error)
+      loadSavedConfigs()
+      
+      // localStorage からの移行処理（一度だけ実行）
+      const migrationKey = 'ai_settings_migrated'
+      const alreadyMigrated = localStorage.getItem(migrationKey)
+      
+      if (!alreadyMigrated) {
+        migrateFromLocalStorage()
+        localStorage.setItem(migrationKey, 'true')
       }
     } else {
       // 未ログイン時はAPIキーをクリア
@@ -360,8 +392,80 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
     }
   }, [isAuthenticated])
 
+  // localStorage からサーバーへの移行処理
+  const migrateFromLocalStorage = async () => {
+    try {
+      const providers = ['openai', 'claude', 'gemini']
+      const migrations: Promise<void>[] = []
+      
+      for (const provider of providers) {
+        const configKey = `ai_config_${provider}`
+        const savedConfig = localStorage.getItem(configKey)
+        
+        if (savedConfig) {
+          try {
+            const parsed = JSON.parse(savedConfig)
+            if (parsed.apiKey && parsed.apiKey.trim()) {
+              // サーバーに保存
+              const settingInput: AIProviderSettingInput = {
+                provider: convertProviderToApi(provider),
+                model: parsed.model || AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS].models[Object.keys(AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS].models)[0]],
+                apiKey: parsed.apiKey,
+                temperature: parsed.temperature || 0.7,
+                maxTokens: parsed.max_tokens || 4000,
+                topP: parsed.top_p || 1.0,
+                frequencyPenalty: parsed.frequency_penalty || 0.0,
+                presencePenalty: parsed.presence_penalty || 0.0,
+                isDefault: false,
+                isActive: true
+              }
+              
+              migrations.push(
+                saveAiSetting(settingInput).then(() => {
+                  // 移行成功後、localStorageから削除
+                  localStorage.removeItem(configKey)
+                }).catch(error => {
+                  console.error(`Failed to migrate ${provider} settings:`, error)
+                })
+              )
+            }
+          } catch (error) {
+            console.error(`Failed to parse ${provider} config:`, error)
+          }
+        }
+      }
+      
+      if (migrations.length > 0) {
+        await Promise.all(migrations)
+        console.log('Settings migrated to server successfully')
+        // 移行後に最新のデータを再読み込み
+        await loadSavedConfigs()
+      }
+    } catch (error) {
+      console.error('Migration failed:', error)
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {/* エラー表示 */}
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>エラー</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* ローディング表示 */}
+      {isLoading && (
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <Cpu className="h-4 w-4 animate-spin" />
+          <AlertTitle>読み込み中</AlertTitle>
+          <AlertDescription>AI設定を読み込んでいます...</AlertDescription>
+        </Alert>
+      )}
+
       {/* ヘッダーと進捗表示 */}
       <Card className="bg-gradient-to-r from-purple-600 to-pink-600 border-0 text-white">
         <CardHeader>
@@ -599,10 +703,10 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                 <div className="flex gap-2">
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !config.apiKey.trim() || !isAuthenticated}
+                    disabled={isSaving || !config.apiKey.trim() || !isAuthenticated}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 h-10 disabled:opacity-50"
                   >
-                    {saving ? (
+                    {isSaving ? (
                       <>
                         <Save className="h-4 w-4 animate-spin" />
                         保存中...
@@ -618,11 +722,11 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                   {config.apiKey && (
                     <Button
                       onClick={handleDelete}
-                      disabled={deleting}
+                      disabled={isDeleting}
                       variant="destructive"
                       className="flex-shrink-0 bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 h-10 px-4"
                     >
-                      {deleting ? (
+                      {isDeleting ? (
                         <>
                           <Trash2 className="h-4 w-4 animate-spin" />
                         </>
@@ -972,10 +1076,10 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                   
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !config.apiKey.trim()}
+                    disabled={isSaving || !config.apiKey.trim()}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 h-12 disabled:opacity-50"
                   >
-                    {saving ? (
+                    {isSaving ? (
                       <>
                         <Save className="h-5 w-5 animate-spin" />
                         保存中...
@@ -993,11 +1097,11 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                 {config.apiKey && (
                   <Button
                     onClick={handleDelete}
-                    disabled={deleting}
+                    disabled={isDeleting}
                     variant="destructive"
                     className="w-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 h-10"
                   >
-                    {deleting ? (
+                    {isDeleting ? (
                       <>
                         <Trash2 className="h-4 w-4 animate-spin" />
                         削除中...

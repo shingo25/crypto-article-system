@@ -7,8 +7,17 @@ export async function POST() {
     });
 
     // auth-tokenクッキーを削除
-    response.cookies.set('auth-token', '', {
+    response.cookies.set('__Host-auth-token', '', {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 0,
+      path: '/',
+    });
+
+    // CSRFトークンも削除
+    response.cookies.set('XSRF-TOKEN', '', {
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 0,

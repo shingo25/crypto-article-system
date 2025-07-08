@@ -11,7 +11,7 @@ export interface AuthUser {
 
 export async function verifyAuth(request: NextRequest): Promise<AuthUser | null> {
   try {
-    const token = request.cookies.get('auth-token')?.value;
+    const token = request.cookies.get('__Host-auth-token')?.value;
     
     if (!token) {
       return null;
@@ -23,7 +23,9 @@ export async function verifyAuth(request: NextRequest): Promise<AuthUser | null>
       return null;
     }
 
-    const payload = verify(token, jwtSecret) as AuthUser;
+    const payload = verify(token, jwtSecret, {
+      algorithms: ['HS256'] // アルゴリズム混同攻撃を防ぐため明示的に指定
+    }) as AuthUser;
     
     // ユーザーが有効かチェック
     const user = await prisma.user.findUnique({

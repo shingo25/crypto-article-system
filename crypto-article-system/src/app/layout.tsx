@@ -5,6 +5,8 @@ import { AppProvider } from "@/components/AppProvider";
 import { initializeErrorHandling } from "@/lib/error-handler";
 import { initializeApplication } from "@/lib/app-initializer";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { headers } from 'next/headers';
+import Script from 'next/script';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,6 +29,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // middlewareからnonce値を取得
+  const nonce = headers().get('x-nonce') || ''
+  
   // サーバーサイドでの初期化処理
   if (typeof window === 'undefined') {
     initializeErrorHandling()
@@ -46,6 +51,20 @@ export default function RootLayout({
         <AuthProvider>
           <AppProvider>{children}</AppProvider>
         </AuthProvider>
+        
+        {/* nonceを必要とするスクリプトにnonceを渡す */}
+        {nonce && (
+          <Script
+            id="nonce-support"
+            nonce={nonce}
+            dangerouslySetInnerHTML={{
+              __html: `
+                // CSP nonce support for dynamic scripts
+                window.__CSP_NONCE__ = '${nonce}';
+              `
+            }}
+          />
+        )}
       </body>
     </html>
   );

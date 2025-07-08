@@ -49,6 +49,7 @@ model User {
   articles  Article[]
   sessions  UserSession[]
   alertSettings AlertSettings[]
+  aiProviderSettings AIProviderSettings[]
   
   @@map("users")
 }
@@ -398,6 +399,49 @@ model AlertSettings {
 }
 
 // ========================================
+// AI Provider Settings Models
+// ========================================
+
+model AIProviderSettings {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  AIProvider
+  
+  // Encrypted API key
+  apiKey    String   // Encrypted API key
+  
+  // Common settings
+  model     String   // Selected model for the provider
+  temperature Float @default(0.7) // 0-1 range
+  maxTokens Int     @default(4000)
+  topP      Float   @default(1.0)
+  frequencyPenalty Float @default(0.0)
+  presencePenalty  Float @default(0.0)
+  
+  // Provider-specific settings (JSON)
+  advancedSettings Json?
+  
+  // Metadata
+  isDefault Boolean @default(false) // Default provider for the user
+  isActive  Boolean @default(true)
+  
+  // Security tracking
+  lastUsed      DateTime?
+  lastModified  DateTime @updatedAt
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Constraints
+  @@unique([userId, provider])
+  @@map("ai_provider_settings")
+}
+
+// ========================================
 // System & Configuration Models
 // ========================================
 
@@ -461,4 +505,10 @@ enum AlertType {
   PRICE_CHANGE    // Price change percentage
   VOLUME_SURGE    // Volume surge
   TECHNICAL       // Technical indicator
+}
+
+enum AIProvider {
+  OPENAI
+  CLAUDE
+  GEMINI
 }

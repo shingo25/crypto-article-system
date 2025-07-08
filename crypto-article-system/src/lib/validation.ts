@@ -68,7 +68,34 @@ export const newsArticleSchema = z.object({
   coins: z.array(z.string().max(10, 'Coin symbol too long')).max(10, 'Too many coins').default([]),
 })
 
-// AI モデル設定スキーマ
+// AI プロバイダー設定スキーマ
+export const aiProviderSettingsSchema = z.object({
+  provider: z.enum(['OPENAI', 'CLAUDE', 'GEMINI'], {
+    errorMap: () => ({ message: 'Invalid AI provider' })
+  }),
+  model: z.string()
+    .min(1, 'Model is required')
+    .max(100, 'Model name too long')
+    .regex(/^[a-zA-Z0-9._-]+$/, 'Invalid model name format'),
+  apiKey: z.string()
+    .min(20, 'API key too short')
+    .max(255, 'API key too long'),
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxTokens: z.number().int().min(1).max(100000).default(4000),
+  topP: z.number().min(0).max(1).default(1.0),
+  frequencyPenalty: z.number().min(-2).max(2).default(0.0),
+  presencePenalty: z.number().min(-2).max(2).default(0.0),
+  isDefault: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+  advancedSettings: z.record(z.any()).optional(),
+})
+
+// AI プロバイダー設定更新用スキーマ（APIキーはオプション）
+export const aiProviderSettingsUpdateSchema = aiProviderSettingsSchema.partial({
+  apiKey: true,
+})
+
+// AI モデル設定スキーマ（後方互換性のため）
 export const aiModelSchema = z.object({
   provider: z.enum(['openai', 'anthropic', 'google'], {
     errorMap: () => ({ message: 'Invalid AI provider' })

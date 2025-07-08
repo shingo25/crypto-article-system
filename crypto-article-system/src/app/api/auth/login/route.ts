@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/lib/rate-limit';
 import { createErrorResponse, AuthenticationError } from '@/lib/error-handler';
+import { generateDoubleSubmitToken } from '@/lib/csrf';
 
 const loginSchema = z.object({
   email: z.string().email('有効なメールアドレスを入力してください'),
@@ -51,12 +52,16 @@ async function loginHandler(request: NextRequest) {
       throw new Error('JWT_SECRET is not configured');
     }
 
+    // CSRFトークン生成
+    const csrfToken = generateDoubleSubmitToken(user.id);
+
     const token = sign(
       {
         userId: user.id,
         email: user.email,
         username: user.username,
         role: user.role,
+        csrfSecret: csrfToken // CSRFシークレットをJWTに含める
       },
       jwtSecret,
       { expiresIn: '7d' }
@@ -81,9 +86,18 @@ async function loginHandler(request: NextRequest) {
       }
     });
 
-    // HttpOnly Cookieとしてトークンを設定
-    response.cookies.set('auth-token', token, {
+    // HttpOnly Cookieとしてトークンを設定（__Host-プレフィックス付き）
+    response.cookies.set('__Host-auth-token', token, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60, // 7日間
+      path: '/',
+    });
+
+    // CSRFトークンをクライアントが読み取り可能なCookieとして設定
+    response.cookies.set('XSRF-TOKEN', csrfToken, {
+      httpOnly: false, // JavaScriptから読み取り可能
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60, // 7日間

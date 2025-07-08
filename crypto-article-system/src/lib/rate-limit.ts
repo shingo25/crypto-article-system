@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server';
+import { checkRedisRateLimit, type RateLimitConfig as RedisRateLimitConfig } from '@/lib/redis-rate-limit';
 
 interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
-// メモリベースのレート制限ストア
+// フォールバック用のメモリベースレート制限ストア
 class MemoryRateLimitStore {
   private store = new Map<string, RateLimitEntry>();
 
@@ -33,10 +34,10 @@ class MemoryRateLimitStore {
   }
 }
 
-const store = new MemoryRateLimitStore();
+const fallbackStore = new MemoryRateLimitStore();
 
 // 5分ごとにクリーンアップ
-setInterval(() => store.cleanup(), 5 * 60 * 1000);
+setInterval(() => fallbackStore.cleanup(), 5 * 60 * 1000);
 
 export interface RateLimitConfig {
   maxRequests: number;
@@ -63,47 +64,72 @@ export function createRateLimit(config: RateLimitConfig) {
   } = config;
 
   return {
-    check: (request: NextRequest): RateLimitResult => {
+    check: async (request: NextRequest): Promise<RateLimitResult> => {
       const key = keyGenerator(request);
-      const now = Date.now();
-      const resetTime = now + windowMs;
-
-      let entry = store.get(key);
-
-      if (!entry) {
-        // 新しいエントリを作成
-        entry = {
-          count: 1,
-          resetTime
+      
+      try {
+        // Redis-based レート制限を試行
+        const result = await checkRedisRateLimit(key, {
+          windowMs,
+          maxRequests,
+          keyPrefix: 'api_rate_limit'
+        });
+        
+        return {
+          allowed: result.allowed,
+          remaining: result.remainingRequests,
+          resetTime: result.resetTime,
+          totalRequests: result.totalRequests
         };
-        store.set(key, entry);
+      } catch (error) {
+        console.warn('Redis rate limit failed, using fallback:', error);
+        
+        // フォールバック: メモリベース
+        const now = Date.now();
+        const resetTime = now + windowMs;
+
+        let entry = fallbackStore.get(key);
+
+        if (!entry) {
+          // 新しいエントリを作成
+          entry = {
+            count: 1,
+            resetTime
+          };
+          fallbackStore.set(key, entry);
+
+          return {
+            allowed: true,
+            remaining: maxRequests - 1,
+            resetTime,
+            totalRequests: 1
+          };
+        }
+
+        // リクエスト数を増加
+        entry.count++;
+        fallbackStore.set(key, entry);
+
+        const allowed = entry.count <= maxRequests;
+        const remaining = Math.max(0, maxRequests - entry.count);
 
         return {
-          allowed: true,
-          remaining: maxRequests - 1,
-          resetTime,
-          totalRequests: 1
+          allowed,
+          remaining,
+          resetTime: entry.resetTime,
+          totalRequests: entry.count
         };
       }
-
-      // リクエスト数を増加
-      entry.count++;
-      store.set(key, entry);
-
-      const allowed = entry.count <= maxRequests;
-      const remaining = Math.max(0, maxRequests - entry.count);
-
-      return {
-        allowed,
-        remaining,
-        resetTime: entry.resetTime,
-        totalRequests: entry.count
-      };
     },
 
-    reset: (request: NextRequest): void => {
+    reset: async (request: NextRequest): Promise<void> => {
       const key = keyGenerator(request);
-      store.set(key, { count: 0, resetTime: Date.now() });
+      try {
+        // Redisリセットは今回は実装しない（必要に応じて追加）
+        fallbackStore.set(key, { count: 0, resetTime: Date.now() });
+      } catch (error) {
+        console.warn('Rate limit reset failed:', error);
+      }
     }
   };
 }
@@ -160,7 +186,7 @@ export function withRateLimit(
   const rateLimit = typeof config === 'string' ? rateLimitConfigs[config] : createRateLimit(config);
 
   return async (request: NextRequest): Promise<Response> => {
-    const result = rateLimit.check(request);
+    const result = await rateLimit.check(request);
 
     if (!result.allowed) {
       return new Response(

@@ -1,24 +1,27 @@
 'use client'
 
-// 動的レンダリングを強制（プリレンダリングエラー回避）
-export const dynamic = 'force-dynamic'
-
 import React, { useState } from 'react'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Settings, Brain, Globe, Palette, Shield, Rss } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
+// 動的レンダリングを強制（プリレンダリングエラー回避）
+export const runtime = 'nodejs'
+
 const AIModelSettings = dynamic(() => import('@/components/AIModelSettings'), {
-  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>
+  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>,
+  ssr: false
 })
 
 const WordPressSettings = dynamic(() => import('@/components/WordPressSettings'), {
-  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>
+  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>,
+  ssr: false
 })
 
 const RSSSourceManager = dynamic(() => import('@/components/RSSSourceManager'), {
-  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>
+  loading: () => <div className="animate-pulse bg-neural-dark/20 h-96 rounded-xl"></div>,
+  ssr: false
 })
 
 export default function SettingsPage() {

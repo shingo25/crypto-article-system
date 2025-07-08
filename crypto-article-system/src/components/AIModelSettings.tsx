@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sparkles, Zap, Brain, Settings2, TestTube, CheckCircle, AlertCircle, Cpu, Eye, EyeOff, Save, Trash2, Key } from "lucide-react"
+import { Sparkles, Zap, Brain, Settings2, TestTube, CheckCircle, AlertCircle, AlertTriangle, Cpu, Eye, EyeOff, Save, Trash2, Key } from "lucide-react"
 
 // AI プロバイダーとモデルの定義（2025年6月28日最新版）
 export const AI_PROVIDERS = {
@@ -338,20 +338,27 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
     setCurrentStep(step)
   }
 
-  // 初期設定読み込み
+  // 初期設定読み込み（ログイン状態に応じて）
   useEffect(() => {
-    try {
-      const savedConfig = localStorage.getItem('ai_config')
-      if (savedConfig) {
-        const parsed = JSON.parse(savedConfig)
-        setConfig(prev => ({ ...prev, ...parsed }))
+    if (isAuthenticated) {
+      // ログイン時は保存済み設定を読み込み
+      try {
+        const savedConfig = localStorage.getItem('ai_config')
+        if (savedConfig) {
+          const parsed = JSON.parse(savedConfig)
+          setConfig(prev => ({ ...prev, ...parsed }))
+        }
+        // 保存済み設定も読み込み
+        loadSavedConfigs()
+      } catch (error) {
+        console.error('設定の読み込みに失敗:', error)
       }
-      // 保存済み設定も読み込み
-      loadSavedConfigs()
-    } catch (error) {
-      console.error('設定の読み込みに失敗:', error)
+    } else {
+      // 未ログイン時はAPIキーをクリア
+      setConfig(prev => ({ ...prev, apiKey: '' }))
+      setSavedConfigs({})
     }
-  }, [])
+  }, [isAuthenticated])
 
   return (
     <div className="space-y-6">
@@ -526,8 +533,9 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                     type={showApiKey ? "text" : "password"}
                     value={config.apiKey}
                     onChange={(e) => setConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                    placeholder={`${currentProvider.name} APIキーを入力...`}
+                    placeholder={isAuthenticated ? `${currentProvider.name} APIキーを入力...` : "ログインが必要です"}
                     className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 pr-10 h-11"
+                    disabled={!isAuthenticated}
                   />
                   <Button
                     type="button"
@@ -535,10 +543,22 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 text-slate-400 hover:text-white"
                     onClick={() => setShowApiKey(!showApiKey)}
+                    disabled={!isAuthenticated}
                   >
                     {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
+                
+                {/* 未ログイン時の警告 */}
+                {!isAuthenticated && (
+                  <Alert className="bg-yellow-500/10 border-yellow-500/30 text-yellow-300">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>ログインが必要です</AlertTitle>
+                    <AlertDescription>
+                      APIキーを設定するにはログインしてください
+                    </AlertDescription>
+                  </Alert>
+                )}
                 
                 {/* APIキー取得リンク */}
                 <div className="p-3 bg-slate-700/50 rounded-lg border border-slate-600">
@@ -579,7 +599,7 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                 <div className="flex gap-2">
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !config.apiKey.trim()}
+                    disabled={saving || !config.apiKey.trim() || !isAuthenticated}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 h-10 disabled:opacity-50"
                   >
                     {saving ? (

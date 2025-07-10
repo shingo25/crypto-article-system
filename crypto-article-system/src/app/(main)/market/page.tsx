@@ -3,7 +3,7 @@
 // 動的レンダリングを強制（プリレンダリングエラー回避）
 export const dynamic = 'force-dynamic'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { MarketPulse } from '@/components/neural/market/MarketPulse'
 import { SystemStatusBar } from '@/components/neural/market/SystemStatusBar'
 import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neural/NeuralCard'
@@ -14,13 +14,11 @@ import {
   Newspaper, 
   Search, 
   RefreshCw, 
-  TrendingUp, 
+  TrendingUp,
   TrendingDown,
   Sparkles,
   ExternalLink,
-  Globe,
   Tag,
-  DollarSign,
   Activity,
   Clock
 } from 'lucide-react'
@@ -135,7 +133,7 @@ export default function MarketOverviewPage() {
   }
 
   // 通貨価格データを取得する関数
-  const loadTickerPrices = async (coins: string[]) => {
+  const loadTickerPrices = useCallback(async (coins: string[]) => {
     if (coins.length === 0) return
     
     try {
@@ -144,7 +142,7 @@ export default function MarketOverviewPage() {
       if (newCoins.length === 0) return
 
       // モック価格データ（実際のAPIに置き換え可能）
-      const mockPrices: Record<string, any> = {
+      const mockPrices: Record<string, { price: number; change24h: number; symbol: string; name: string }> = {
         'BTC': { price: 67420, change24h: 3.47, symbol: 'BTC', name: 'Bitcoin' },
         'ETH': { price: 3845, change24h: 5.12, symbol: 'ETH', name: 'Ethereum' },
         'SOL': { price: 178, change24h: -1.23, symbol: 'SOL', name: 'Solana' },
@@ -159,7 +157,7 @@ export default function MarketOverviewPage() {
         'NEAR': { price: 6.23, change24h: 6.1, symbol: 'NEAR', name: 'NEAR Protocol' }
       }
 
-      const newPrices: Record<string, any> = {}
+      const newPrices: Record<string, { price: number; change24h: number; symbol: string; name: string }> = {}
       newCoins.forEach(coin => {
         if (mockPrices[coin]) {
           newPrices[coin] = mockPrices[coin]
@@ -170,10 +168,10 @@ export default function MarketOverviewPage() {
     } catch (error) {
       console.error('Failed to load ticker prices:', error)
     }
-  }
+  }, [tickerPrices])
 
   // RSS設定からニュースデータを取得
-  const loadNewsData = async (isAutoRefresh = false) => {
+  const loadNewsData = useCallback(async (isAutoRefresh = false) => {
     setIsLoading(true)
     
     // 自動更新の場合は控えめなトースト表示
@@ -231,7 +229,7 @@ export default function MarketOverviewPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [loadTickerPrices])
 
   useEffect(() => {
     // 初回ロード（手動更新扱い）
@@ -249,7 +247,7 @@ export default function MarketOverviewPage() {
     return () => {
       clearInterval(refreshInterval)
     }
-  }, []) // 依存配列を空にして、一度だけ実行
+  }, [loadNewsData]) // loadNewsData関数を依存配列に追加
   
   // カウントダウンタイマーは別のuseEffectで管理
   useEffect(() => {

@@ -33,7 +33,7 @@ const getContentHandler = requireAuth(async (request: NextRequest, user) => {
     })
 
     // フィルタ構築
-    const filter: any = {}
+    const filter: Record<string, unknown> = {}
     if (validatedParams.categories) filter.categories = validatedParams.categories
     if (validatedParams.tags) filter.tags = validatedParams.tags
     if (validatedParams.status) filter.status = validatedParams.status

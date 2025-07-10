@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     let addedCount = 0
     let skippedCount = 0
-    const errors: any[] = []
+    const errors: Array<{source: string, error: string}> = []
 
     for (const source of defaultRSSSources) {
       try {

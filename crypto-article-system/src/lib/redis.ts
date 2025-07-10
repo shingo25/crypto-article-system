@@ -1,5 +1,5 @@
 import Redis from 'ioredis'
-import { createComponentLogger } from './logger'
+import { createComponentLogger } from './simple-logger'
 
 const componentLogger = createComponentLogger('Redis')
 
@@ -145,8 +145,8 @@ class RedisConnection {
   // 接続状態を確認
   public async isHealthy(): Promise<boolean> {
     try {
-      if (!this.redis) return false
-      await this.redis.ping()
+      const redis = await this.getRedis()
+      await redis.ping()
       return true
     } catch (error) {
       componentLogger.error('Redis health check failed', error as Error)

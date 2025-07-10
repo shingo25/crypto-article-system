@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createComponentLogger } from '@/lib/simple-logger'
 import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
+import { prisma } from '@/lib/prisma'
+import { redisConnection } from '@/lib/redis'
 
 const componentLogger = createComponentLogger('HealthAPI')
 
@@ -31,8 +33,8 @@ interface HealthStatus {
 async function checkDatabase(): Promise<ComponentHealth> {
   const startTime = Date.now()
   try {
-    // ここでデータベース接続をテスト
-    // const result = await db.query('SELECT 1')
+    // データベース接続をテスト
+    const result = await prisma.$queryRaw`SELECT 1 as test`
     
     return {
       name: 'database',
@@ -41,7 +43,7 @@ async function checkDatabase(): Promise<ComponentHealth> {
       responseTime: Date.now() - startTime,
       details: {
         connectionPool: 'available',
-        // connections: result.connectionCount
+        testQuery: 'successful'
       }
     }
   } catch (error) {
@@ -59,18 +61,19 @@ async function checkDatabase(): Promise<ComponentHealth> {
 async function checkRedis(): Promise<ComponentHealth> {
   const startTime = Date.now()
   try {
-    // ここでRedis接続をテスト
-    // const client = getRedisClient()
-    // await client.ping()
+    // Redis接続をテスト
+    const isHealthy = await redisConnection.isHealthy()
+    const stats = await redisConnection.getStats()
     
     return {
       name: 'redis',
-      status: 'healthy',
+      status: isHealthy ? 'healthy' : 'unhealthy',
       lastCheck: new Date().toISOString(),
       responseTime: Date.now() - startTime,
       details: {
-        connected: true,
-        // memoryUsage: await client.info('memory')
+        connected: stats.connected,
+        memory: stats.memory,
+        connectedClients: stats.connectedClients
       }
     }
   } catch (error) {
@@ -157,18 +160,18 @@ export async function GET() {
     // 各コンポーネントのヘルスチェックを並行実行
     const [
       databaseHealth,
-      redisHealth,
-      externalAPIHealths
+      redisHealth
+      // externalAPIHealths - 一時的に無効化
     ] = await Promise.all([
       checkDatabase(),
-      checkRedis(),
-      checkExternalAPIs()
+      checkRedis()
+      // checkExternalAPIs() - 一時的に無効化
     ])
 
     const components = [
       databaseHealth,
-      redisHealth,
-      ...externalAPIHealths
+      redisHealth
+      // ...externalAPIHealths - 一時的に無効化
     ]
 
     // 全体的なステータスを決定

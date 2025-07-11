@@ -1,13 +1,21 @@
 import { PrismaClient } from '@/generated/prisma'
 import { encrypt, decrypt } from './encryption'
+import { applyTenantMiddleware } from './tenant-middleware'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
-})
+export const prisma = globalForPrisma.prisma ?? (() => {
+  const client = new PrismaClient({
+    log: ['query', 'info', 'warn', 'error'],
+  })
+  
+  // テナント分離ミドルウェアを適用
+  applyTenantMiddleware(client)
+  
+  return client
+})()
 
 // 暗号化対象のモデルとフィールドを定義
 const ENCRYPTED_FIELDS = {

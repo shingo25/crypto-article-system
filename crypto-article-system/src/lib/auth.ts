@@ -1,15 +1,23 @@
 import { verify } from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { setCurrentOrganizationId, validateUserOrganizationAccess } from '@/lib/tenant-middleware';
+import { isMFARequired, validateMFASetup } from '@/lib/mfa';
 
 export interface AuthUser {
   userId: string;
   email: string;
   username: string;
   role: string;
+  organizationId?: string;
+  organizationRole?: string;
+  mfaEnabled?: boolean;
 }
 
-export async function verifyAuth(request: NextRequest): Promise<AuthUser | null> {
+export async function verifyAuth(
+  request: NextRequest, 
+  options?: { requireOrganization?: boolean; organizationId?: string }
+): Promise<AuthUser | null> {
   try {
     // 開発環境では__Host-プレフィックスなしのCookie名を使用
     const cookieName = process.env.NODE_ENV === 'production' ? '__Host-auth-token' : 'auth-token';
@@ -33,10 +41,70 @@ export async function verifyAuth(request: NextRequest): Promise<AuthUser | null>
     // ユーザーが有効かチェック
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { isActive: true }
+      select: { 
+        isActive: true,
+        mfaEnabled: true,
+        mfaSecret: true,
+        memberships: {
+          where: { isActive: true },
+          include: {
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                settings: true
+              }
+            }
+          }
+        }
+      }
     });
 
     if (!user || !user.isActive) {
+      return null;
+    }
+
+    // MFA検証（必要な場合）
+    if (user.memberships.length > 0) {
+      const membership = user.memberships[0]; // 第一組織を使用
+      const organizationRole = membership.role;
+      const organizationSettings = membership.organization.settings;
+      
+      // MFAが必要かチェック
+      if (isMFARequired(organizationRole, organizationSettings)) {
+        if (!validateMFASetup(user.mfaEnabled, user.mfaSecret)) {
+          // MFA設定が不完全な場合はMFA設定を促す
+          console.warn(`[AUTH] MFA required but not configured for user ${payload.userId}`);
+          return null;
+        }
+      }
+      
+      // 組織コンテキストを設定
+      if (options?.organizationId) {
+        // 指定された組織へのアクセス権を検証
+        const hasAccess = await validateUserOrganizationAccess(
+          payload.userId, 
+          options.organizationId, 
+          prisma
+        );
+        
+        if (!hasAccess) {
+          console.warn(`[AUTH] User ${payload.userId} does not have access to organization ${options.organizationId}`);
+          return null;
+        }
+        
+        setCurrentOrganizationId(options.organizationId);
+        payload.organizationId = options.organizationId;
+      } else if (user.memberships.length > 0) {
+        // デフォルト組織を設定
+        const defaultOrg = user.memberships[0].organization;
+        setCurrentOrganizationId(defaultOrg.id);
+        payload.organizationId = defaultOrg.id;
+        payload.organizationRole = membership.role;
+      }
+    } else if (options?.requireOrganization) {
+      // 組織が必要だが所属していない
+      console.warn(`[AUTH] User ${payload.userId} has no organization membership`);
       return null;
     }
 

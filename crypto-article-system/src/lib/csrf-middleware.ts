@@ -43,7 +43,9 @@ export function withCSRFProtection(
 
     try {
       // 認証トークンを取得
-      const authToken = request.cookies.get('__Host-auth-token')?.value
+      // 開発環境では__Host-プレフィックスなしのCookie名を使用
+      const cookieName = process.env.NODE_ENV === 'production' ? '__Host-auth-token' : 'auth-token';
+      const authToken = request.cookies.get(cookieName)?.value
       if (!authToken) {
         return NextResponse.json(
           { error: '認証が必要です' },
@@ -114,7 +116,9 @@ export function protectCSRF<T extends any[]>(
 
     try {
       // 認証トークンを取得
-      const authToken = request.cookies.get('__Host-auth-token')?.value
+      // 開発環境では__Host-プレフィックスなしのCookie名を使用
+      const cookieName = process.env.NODE_ENV === 'production' ? '__Host-auth-token' : 'auth-token';
+      const authToken = request.cookies.get(cookieName)?.value
       if (!authToken) {
         return NextResponse.json(
           { error: '認証が必要です' },
@@ -138,6 +142,7 @@ export function protectCSRF<T extends any[]>(
 
       // CSRFトークンを取得
       const csrfToken = getCSRFTokenFromRequest(request)
+      
       if (!csrfToken) {
         return NextResponse.json(
           { error: 'CSRFトークンが見つかりません' },
@@ -147,6 +152,7 @@ export function protectCSRF<T extends any[]>(
 
       // Double Submit Tokenを検証
       const isValidToken = verifyDoubleSubmitToken(csrfToken, payload.userId)
+      
       if (!isValidToken) {
         return NextResponse.json(
           { error: 'CSRFトークンが無効です' },
@@ -174,7 +180,9 @@ export function createCSRFTokenEndpoint() {
   return async (request: NextRequest) => {
     try {
       // 認証トークンを取得
-      const authToken = request.cookies.get('__Host-auth-token')?.value
+      // 開発環境では__Host-プレフィックスなしのCookie名を使用
+      const cookieName = process.env.NODE_ENV === 'production' ? '__Host-auth-token' : 'auth-token';
+      const authToken = request.cookies.get(cookieName)?.value
       if (!authToken) {
         return NextResponse.json(
           { error: '認証が必要です' },

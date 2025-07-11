@@ -1,5 +1,5 @@
 import { verify } from 'jsonwebtoken';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export interface AuthUser {
@@ -11,7 +11,10 @@ export interface AuthUser {
 
 export async function verifyAuth(request: NextRequest): Promise<AuthUser | null> {
   try {
-    const token = request.cookies.get('__Host-auth-token')?.value;
+    // 開発環境では__Host-プレフィックスなしのCookie名を使用
+    const cookieName = process.env.NODE_ENV === 'production' ? '__Host-auth-token' : 'auth-token';
+    
+    const token = request.cookies.get(cookieName)?.value;
     
     if (!token) {
       return null;
@@ -19,7 +22,7 @@ export async function verifyAuth(request: NextRequest): Promise<AuthUser | null>
 
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      console.error('JWT_SECRET is not configured');
+      console.error('[AUTH] JWT_SECRET is not configured');
       return null;
     }
 
@@ -39,7 +42,8 @@ export async function verifyAuth(request: NextRequest): Promise<AuthUser | null>
 
     return payload;
   } catch (error) {
-    console.error('Auth verification failed:', error);
+    // セキュリティ上、詳細なエラー情報は出力しない
+    console.error('[AUTH] Authentication failed');
     return null;
   }
 }
@@ -49,10 +53,7 @@ export function requireAuth(handler: (request: NextRequest, user: AuthUser) => P
     const user = await verifyAuth(request);
     
     if (!user) {
-      return new Response(JSON.stringify({ error: '認証が必要です' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     return handler(request, user);
@@ -62,22 +63,20 @@ export function requireAuth(handler: (request: NextRequest, user: AuthUser) => P
 export function requireRole(roles: string[]) {
   return function(handler: (request: NextRequest, user: AuthUser) => Promise<Response>) {
     return async (request: NextRequest) => {
+      console.log('[AUTH] requireRole middleware called');
       const user = await verifyAuth(request);
       
       if (!user) {
-        return new Response(JSON.stringify({ error: '認証が必要です' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        console.log('[AUTH] Authentication failed in requireRole');
+        return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
       }
 
       if (!roles.includes(user.role)) {
-        return new Response(JSON.stringify({ error: 'アクセス権限がありません' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        console.log('[AUTH] Role check failed:', user.role, 'not in', roles);
+        return NextResponse.json({ error: 'アクセス権限がありません' }, { status: 403 });
       }
 
+      console.log('[AUTH] Role check passed, proceeding to handler');
       return handler(request, user);
     };
   };

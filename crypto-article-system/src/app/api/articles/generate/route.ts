@@ -1,128 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
+import { addArticleGenerationJob, initializeArticleGeneratorWorker } from '@/lib/workers/article-generator-worker'
+import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
+import { createComponentLogger } from '@/lib/simple-logger'
+import { createMockJob } from '@/lib/mock-job-system'
+import { z } from 'zod'
+
+const componentLogger = createComponentLogger('ArticleGenerateAPI')
+
+// ワーカーを初期化（一度だけ実行）
+let workerInitialized = false
+if (!workerInitialized) {
+  initializeArticleGeneratorWorker()
+  workerInitialized = true
+}
+
+// リクエストバリデーションスキーマ
+const generateRequestSchema = z.object({
+  newsId: z.string().min(1, 'ニュースIDは必須です'),
+  templateId: z.string().optional(),
+  options: z.object({
+    style: z.enum(['detailed', 'concise', 'technical']).optional(),
+    length: z.enum(['short', 'medium', 'long']).optional()
+  }).optional()
+})
 
 interface GenerateRequest {
-  source_type: 'rss' | 'topic' | 'manual' | 'news'
-  source_content: string
-  ai_provider?: 'openai' | 'anthropic' | 'gemini'
-  ai_model?: string
-  temperature?: number
-  max_tokens?: number
-  template_id?: string
-  language?: string
-  style?: 'detailed' | 'concise' | 'technical'
-  length?: 'short' | 'medium' | 'long'
-  topic?: string
-  newsId?: string
-}
-
-interface GeneratedArticle {
-  id: string
-  title: string
-  content: string
-  summary: string
-  tags: string[]
-  wordCount: number
-  estimatedReadTime: number
-  generatedAt: string
-  sourceType: string
-  sourceContent: string
-  aiProvider: string
-}
-
-// Mock article generation function
-function generateMockArticle(request: GenerateRequest): GeneratedArticle {
-  const { 
-    source_content, 
-    ai_provider = 'gemini', 
-    ai_model = 'gemini-1.5-pro',
-    temperature = 0.7,
-    max_tokens = 1000,
-    style = 'detailed', 
-    length = 'medium' 
-  } = request
-  
-  // Generate mock content based on parameters
-  const baseContent = `# ${source_content}
-
-これは「${source_content}」に関するAI生成記事です。
-
-## 概要
-
-${source_content}について詳しく分析し、最新の情報をお届けします。
-
-## 詳細分析
-
-${style === 'technical' ? 
-  '技術的な観点から詳細に分析すると、以下の要因が重要です：' :
-  style === 'concise' ?
-  '簡潔にまとめると：' :
-  '詳細に検討すると：'
-}
-
-- 市場動向の分析
-- 技術的要因の検討  
-- 将来の予測
-- リスク要因の評価
-
-## まとめ
-
-${source_content}に関する分析結果をまとめると、今後の動向に注目が必要です。
-
-*この記事は${ai_provider.toUpperCase()} ${ai_model} (Temperature: ${temperature}, Max Tokens: ${max_tokens}) によって生成されました。*
-`
-
-  const wordCount = baseContent.length
-  const estimatedReadTime = Math.ceil(wordCount / 400) // 400文字/分で計算
-
-  return {
-    id: `article_${Date.now()}`,
-    title: `${source_content} - AI分析レポート`,
-    content: baseContent,
-    summary: `${source_content}に関するAI生成分析記事。市場動向、技術的要因、将来予測を含む包括的なレポート。`,
-    tags: ['AI生成', 'crypto', '分析', style],
-    wordCount,
-    estimatedReadTime,
-    generatedAt: new Date().toISOString(),
-    sourceType: request.source_type,
-    sourceContent: source_content,
-    aiProvider: ai_provider
+  newsId: string
+  templateId?: string
+  options?: {
+    style?: 'detailed' | 'concise' | 'technical'
+    length?: 'short' | 'medium' | 'long'
   }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = requireAuth(async (request: NextRequest, user) => {
+  
   try {
     const body = await request.json() as GenerateRequest
     
-    // Validate required fields
-    if (!body.source_type || !body.source_content) {
-      return NextResponse.json({
-        success: false,
-        error: 'source_type and source_content are required'
-      }, { status: 400 })
-    }
+    // リクエストデータを検証
+    const validatedData = generateRequestSchema.parse(body)
+    
+    componentLogger.info('記事生成リクエスト受信', {
+      userId: user.userId,
+      newsId: validatedData.newsId,
+      options: validatedData.options
+    })
 
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // モックジョブを作成
+    const jobId = createMockJob(validatedData.newsId, user.userId)
 
-    // Generate mock article
-    const article = generateMockArticle(body)
+    componentLogger.info('記事生成ジョブを追加', {
+      jobId,
+      userId: user.userId,
+      newsId: validatedData.newsId
+    })
 
     return NextResponse.json({
       success: true,
       data: {
-        article,
-        processingTime: '2.1s',
-        apiProvider: body.ai_provider || 'gemini',
-        timestamp: new Date().toISOString()
+        jobId,
+        status: 'queued',
+        message: '記事生成を開始しました。生成には数分かかる場合があります。',
+        estimatedTime: '2-5分',
+        checkStatusUrl: `/api/jobs/${jobId}/status`
       }
     })
 
   } catch (error) {
-    console.error('Article generation error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to generate article',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
-}
+    componentLogger.error('記事生成リクエストエラー', error as Error, {
+      userId: user.userId
+    })
+
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          formatApiError(new AppError('入力データが無効です', {
+            type: ErrorType.VALIDATION_ERROR,
+            code: 'INVALID_INPUT',
+            statusCode: 400,
+            context: { issues: error.issues }
+          })),
+          { status: 400 }
+        )
+      }
+
+      return NextResponse.json(
+        formatApiError(new AppError('記事生成の開始に失敗しました', {
+          type: ErrorType.PROCESSING_ERROR,
+          code: 'GENERATION_START_FAILED',
+          statusCode: 500
+        })),
+        { status: 500 }
+      )
+    }
+})

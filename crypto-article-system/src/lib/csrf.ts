@@ -68,6 +68,7 @@ export function verifyDoubleSubmitToken(token: string, sessionId: string): boole
   
   try {
     const parts = token.split('.')
+    
     if (parts.length !== 3) {
       return false
     }

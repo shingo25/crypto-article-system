@@ -70,7 +70,7 @@ export interface AuthState {
 }
 
 // APIクライアントの設定
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
 class AuthAPI {
   private static instance: AuthAPI
@@ -116,8 +116,8 @@ class AuthAPI {
     return response.json()
   }
   
-  async login(credentials: LoginCredentials): Promise<AuthTokens> {
-    return this.request<AuthTokens>('/api/auth/login', {
+  async login(credentials: LoginCredentials): Promise<any> {
+    return this.request<any>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
@@ -213,13 +213,22 @@ export const useAuthStore = create<AuthState>()(
             const api = AuthAPI.getInstance()
             const response = await api.login({ email, password })
             
-            // レスポンスに含まれるユーザー情報を使用
-            const user = response.user
+            // Next.js APIのレスポンス構造に合わせて調整
+            const user = {
+              id: parseInt(response.user?.id || '0'),
+              email: response.user?.email || email,
+              full_name: `${response.user?.firstName || ''} ${response.user?.lastName || ''}`.trim(),
+              is_active: true,
+              is_verified: true,
+              created_at: new Date().toISOString(),
+              last_login: new Date().toISOString()
+            }
+            
             const tokens = {
-              access_token: response.access_token,
-              refresh_token: response.refresh_token,
-              token_type: response.token_type,
-              expires_in: response.expires_in
+              access_token: 'dummy_token', // Cookieベース認証なのでダミー値
+              refresh_token: 'dummy_refresh_token',
+              token_type: 'Bearer',
+              expires_in: 604800 // 7日間
             }
             
             set({

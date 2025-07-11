@@ -39,12 +39,13 @@ export const AI_PROVIDERS = {
       'gpt-4.1-turbo': { name: 'GPT-4.1 Turbo', description: 'API最高性能・長文脈処理', cost: '$$$$$', speed: '⚡⚡' },
       
       // 推論特化 o3ファミリー（最新）
-      'o3-pro': { name: 'o3 Pro', description: '🔥最新・最上位推論モデル', cost: '$$$$$$', speed: '⚡' },
-      'o3': { name: 'o3', description: '第3世代推論・エージェント能力', cost: '$$$$$', speed: '⚡⚡' },
-      'o3-mini': { name: 'o3 Mini', description: 'o3ファミリーの効率版', cost: '$$$', speed: '⚡⚡⚡' },
+      'o3-pro-20250125': { name: 'o3 Pro', description: '🔥最新・最上位推論モデル', cost: '$$$$$$', speed: '⚡' },
+      'o3-20250125': { name: 'o3', description: '第3世代推論・エージェント能力', cost: '$$$$$', speed: '⚡⚡' },
+      'o3-mini-20250125': { name: 'o3 Mini', description: 'o3ファミリーの効率版', cost: '$$$', speed: '⚡⚡⚡' },
       
       // 推論特化 o1ファミリー
-      'o1': { name: 'o1', description: '第1世代推論特化モデル', cost: '$$$$', speed: '⚡⚡' },
+      'o1-20241217': { name: 'o1', description: '第1世代推論特化モデル', cost: '$$$$', speed: '⚡⚡' },
+      'o1-mini-20241217': { name: 'o1 Mini', description: 'o1ファミリーの効率版', cost: '$$$', speed: '⚡⚡⚡' },
     }
   },
   claude: {
@@ -53,8 +54,8 @@ export const AI_PROVIDERS = {
     color: 'from-orange-400 to-pink-500',
     models: {
       // Claude 4ファミリー（2025年5月発表）
-      'claude-opus-4': { name: 'Claude Opus 4', description: '🔥最上位・自律コーディング特化', cost: '$$$$$$', speed: '⚡⚡' },
-      'claude-sonnet-4': { name: 'Claude Sonnet 4', description: '🔥バランス重視・企業向け', cost: '$$$$', speed: '⚡⚡⚡' },
+      'claude-opus-4-20250514': { name: 'Claude Opus 4', description: '🔥最上位・自律コーディング特化', cost: '$$$$$$', speed: '⚡⚡' },
+      'claude-sonnet-4-20250514': { name: 'Claude Sonnet 4', description: '🔥バランス重視・企業向け', cost: '$$$$', speed: '⚡⚡⚡' },
       
       // Claude 3.5ファミリー（Artifacts機能付き）
       'claude-3-5-sonnet-20241022': { name: 'Claude-3.5 Sonnet', description: 'Artifacts・リアルタイム編集', cost: '$$$$', speed: '⚡⚡⚡' },
@@ -104,7 +105,7 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
   const { isAuthenticated } = useOptionalAuth()
   const [config, setConfig] = useState<AIConfig>({
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     apiKey: '',
     temperature: 0.7,
     max_tokens: 2000,
@@ -175,20 +176,27 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
     setTestResult(null)
     
     try {
-      // テスト用のシンプルなプロンプト
-      const testPrompt = "暗号通貨について30文字程度で簡潔に説明してください。"
+      // バックエンドAPIを呼び出してAPIキーをテスト
+      const response = await fetch(`/api/users/ai-settings/test?provider=${config.provider.toUpperCase()}`)
+      const data = await response.json()
       
-      // ここで実際のAPI呼び出しを行う（実装は省略）
-      await new Promise(resolve => setTimeout(resolve, 2000)) // 模擬的な待機
-      
-      setTestResult({
-        success: true,
-        message: `${currentProvider.name} ${currentModel?.name} との接続に成功しました！`
-      })
+      if (response.ok && data.success) {
+        setTestResult({
+          success: true,
+          message: data.message || `${currentProvider.name} ${currentModel?.name} との接続に成功しました！`
+        })
+      } else {
+        const errorMessage = data.error || 'Unknown error'
+        const details = data.details?.message ? ` (${data.details.message})` : ''
+        setTestResult({
+          success: false,
+          message: `${errorMessage}${details}`
+        })
+      }
     } catch (error) {
       setTestResult({
         success: false,
-        message: `接続テストに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `接続テストに失敗しました: ${error instanceof Error ? error.message : 'Network error'}`
       })
     } finally {
       setTesting(false)
@@ -214,18 +222,60 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
     
     try {
       // API設定をサーバーに保存
+      const trimmedApiKey = config.apiKey.trim()
+      
+      // マスクされたAPIキーかどうかをチェック  
+      // 1. "..." を含む場合（例: sk-...1234）
+      // 2. 暗号化された形式（Base64で100文字以上）のみ
+      const isMaskedApiKey = trimmedApiKey.includes('...') || 
+                           (trimmedApiKey.length > 100 && /^[A-Za-z0-9+/]+=*$/.test(trimmedApiKey))
+      
+      // デバッグログ追加
+      console.log('Save Config Debug:', {
+        provider: config.provider,
+        providerType: typeof config.provider,
+        model: config.model,
+        apiKeyLength: trimmedApiKey.length
+      })
+
+      if (!config.provider) {
+        throw new Error('プロバイダーが選択されていません')
+      }
+
       const settingInput: AIProviderSettingInput = {
         provider: convertProviderToApi(config.provider),
-        model: config.model,
-        apiKey: config.apiKey,
-        temperature: config.temperature,
-        maxTokens: config.max_tokens,
-        topP: config.top_p,
-        frequencyPenalty: config.frequency_penalty,
-        presencePenalty: config.presence_penalty,
+        model: config.model.trim(),
+        apiKey: trimmedApiKey,
+        temperature: Number(config.temperature),
+        maxTokens: Number(config.max_tokens),
+        topP: Number(config.top_p),
+        frequencyPenalty: Number(config.frequency_penalty),
+        presencePenalty: Number(config.presence_penalty),
         isDefault: false,
         isActive: true
       }
+      
+      // デバッグ用ログ
+      console.log('API Key Analysis:', {
+        length: trimmedApiKey.length,
+        starts: `${trimmedApiKey.substring(0, 10)}...`,
+        containsDots: trimmedApiKey.includes('...'),
+        isBase64Pattern: /^[A-Za-z0-9+/]+=*$/.test(trimmedApiKey),
+        startsWithKnownPrefix: trimmedApiKey.startsWith('sk-') || trimmedApiKey.startsWith('AIza') || trimmedApiKey.startsWith('sk-ant-'),
+        isMasked: isMaskedApiKey
+      })
+
+      // マスクされたAPIキーの場合は、APIキーフィールドを除外して更新専用APIを使用
+      if (isMaskedApiKey) {
+        console.log('Detected masked API key, excluding from update')
+        delete (settingInput as any).apiKey
+      }
+      
+      // デバッグ用: 送信するデータをログ出力
+      console.log('Sending AI setting data:', {
+        ...settingInput,
+        apiKey: settingInput.apiKey ? `${settingInput.apiKey.substring(0, 10)}...` : 'excluded' // APIキーの最初の10文字のみ
+      })
       
       const savedSetting = await saveAiSetting(settingInput)
       
@@ -244,7 +294,24 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
         message: '設定が正常に保存されました'
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '設定の保存に失敗しました'
+      console.error('AI setting save error:', error)
+      let errorMessage = '設定の保存に失敗しました'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+        // バリデーションエラーの詳細を表示
+        if (error.message.includes('バリデーションエラー')) {
+          try {
+            const errorData = JSON.parse(error.message.split('バリデーションエラー: ')[1] || '{}')
+            if (errorData.details && Array.isArray(errorData.details)) {
+              errorMessage = `バリデーションエラー: ${errorData.details.map((d: any) => `${d.field}: ${d.message}`).join(', ')}`
+            }
+          } catch (parseError) {
+            // JSON パースに失敗した場合は元のエラーメッセージを使用
+          }
+        }
+      }
+      
       setError(errorMessage)
       setTestResult({
         success: false,
@@ -629,9 +696,32 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                <Label className="text-white font-medium">
-                  {currentProvider.name} API キー
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-white font-medium">
+                    {currentProvider.name} API キー
+                  </Label>
+                  <a
+                    href={
+                      config.provider === 'openai' 
+                        ? 'https://platform.openai.com/api-keys'
+                        : config.provider === 'claude'
+                        ? 'https://console.anthropic.com/account/keys'
+                        : config.provider === 'gemini'
+                        ? 'https://aistudio.google.com/app/apikey'
+                        : '#'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                  >
+                    APIキーを取得 →
+                  </a>
+                </div>
+                <div className="text-xs text-slate-400 mb-2">
+                  {config.provider === 'openai' && 'フォーマット: sk-proj-... または sk-...'}
+                  {config.provider === 'claude' && 'フォーマット: sk-ant-api03-... または sk-ant-...'}
+                  {config.provider === 'gemini' && 'フォーマット: AIza...'}
+                </div>
                 <div className="relative">
                   <Input
                     type={showApiKey ? "text" : "password"}
@@ -676,15 +766,15 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                           <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline font-medium">
                             OpenAI Platform
                           </a>
-                          {' '}で取得できます
+                          {' '}で取得できます（sk-proj-...またはsk-...形式）
                         </>
                       )}
                       {config.provider === 'claude' && (
                         <>
-                          <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline font-medium">
+                          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline font-medium">
                             Anthropic Console
                           </a>
-                          {' '}で取得できます
+                          {' '}で取得できます（sk-ant-api03-...形式）
                         </>
                       )}
                       {config.provider === 'gemini' && (
@@ -692,7 +782,7 @@ export default function AIModelSettings({ onSave, initialConfig }: AIModelSettin
                           <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline font-medium">
                             Google AI Studio
                           </a>
-                          {' '}で取得できます
+                          {' '}で取得できます（AIza...形式）
                         </>
                       )}
                     </div>

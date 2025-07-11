@@ -7,8 +7,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useArticles } from '@/hooks/useArticles'
 import { apiClient } from '@/lib/api'
+import { ArticleVersionManager } from './ArticleVersionManager'
 import toast from 'react-hot-toast'
 import DOMPurify from 'dompurify'
 import { 
@@ -28,7 +30,8 @@ import {
   Download,
   Shield,
   ShieldAlert,
-  ShieldCheck
+  ShieldCheck,
+  History
 } from 'lucide-react'
 
 interface ArticleEditorProps {
@@ -218,20 +221,33 @@ export function ArticleEditor({
         </div>
       </CardHeader>
 
-      <CardContent className="p-6 space-y-6">
-        {/* タイトル編集 */}
-        <div className="space-y-2">
-          <Label className="text-white flex items-center gap-2">
-            <Type className="h-4 w-4" />
-            タイトル
-          </Label>
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="記事のタイトルを入力..."
-            className="bg-gray-700/50 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
-          />
-        </div>
+      <CardContent className="p-6">
+        <Tabs defaultValue="edit" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="edit" className="flex items-center gap-2">
+              <Edit3 className="h-4 w-4" />
+              編集
+            </TabsTrigger>
+            <TabsTrigger value="versions" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              バージョン履歴
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="edit" className="space-y-6">
+            {/* タイトル編集 */}
+            <div className="space-y-2">
+              <Label className="text-white flex items-center gap-2">
+                <Type className="h-4 w-4" />
+                タイトル
+              </Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="記事のタイトルを入力..."
+                className="bg-gray-700/50 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
 
         {/* 記事タイプ */}
         <div className="space-y-2">
@@ -410,6 +426,21 @@ export function ArticleEditor({
             />
           )}
         </div>
+          </TabsContent>
+
+          <TabsContent value="versions">
+            <ArticleVersionManager 
+              articleId={articleId} 
+              onVersionRestored={() => {
+                // バージョンが復元された時の処理
+                toast.success('バージョンが復元されました。ページを再読み込みして最新の内容を確認してください。')
+                if (onSave) {
+                  onSave({ restored: true })
+                }
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
 
       <CardFooter className="border-t border-gray-700/50 p-6">

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { useArticles } from '@/hooks/useArticles'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { ArticleEditor } from './ArticleEditor'
+import { apiClient } from '@/lib/api'
 import { FileText, Eye, Trash2, Upload, Edit3, Clock, ExternalLink } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
@@ -185,9 +186,10 @@ const ArticleCard = React.memo(({
             size="sm"
             variant="outline"
             className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+            disabled={isUpdatingStatus || loadingArticleContent}
           >
             <Edit3 className="h-3 w-3 mr-1" />
-            編集
+            {loadingArticleContent ? '読み込み中...' : '編集'}
           </Button>
           
           {article.status !== 'published' && (
@@ -221,6 +223,8 @@ ArticleCard.displayName = 'ArticleCard'
 
 export function ArticleList({ articles, isLoading }: ArticleListProps) {
   const [editingArticle, setEditingArticle] = useState<Article | null>(null)
+  const [loadingArticleContent, setLoadingArticleContent] = useState(false)
+  const [articleContent, setArticleContent] = useState<string>('')
   
   const { 
     deleteArticle, 
@@ -231,12 +235,24 @@ export function ArticleList({ articles, isLoading }: ArticleListProps) {
     isUpdatingStatus
   } = useArticles()
 
-  const handleEdit = (article: Article) => {
-    setEditingArticle(article)
+  const handleEdit = async (article: Article) => {
+    setLoadingArticleContent(true)
+    try {
+      const response = await apiClient.getArticleContent(article.id)
+      setArticleContent(response.content || '')
+      setEditingArticle(article)
+    } catch (error) {
+      console.error('記事コンテンツの取得に失敗しました:', error)
+      setArticleContent('')
+      setEditingArticle(article)
+    } finally {
+      setLoadingArticleContent(false)
+    }
   }
 
   const handleCloseEditor = () => {
     setEditingArticle(null)
+    setArticleContent('')
   }
 
   if (isLoading) {
@@ -284,7 +300,7 @@ export function ArticleList({ articles, isLoading }: ArticleListProps) {
             <ArticleEditor
               articleId={editingArticle.id}
               initialTitle={editingArticle.title}
-              initialContent=""
+              initialContent={articleContent}
               initialType={editingArticle.type}
               initialCoins={editingArticle.coins}
               onClose={handleCloseEditor}

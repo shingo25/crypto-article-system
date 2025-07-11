@@ -10,6 +10,9 @@ import { NeuralCard, CardContent, CardHeader, CardTitle } from '@/components/neu
 import { NeuralButton } from '@/components/neural/NeuralButton'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
+import NewsBasedArticleGenerationForm from '@/components/NewsBasedArticleGenerationForm'
+import { useArticleGeneration } from '@/hooks/useArticleGeneration'
 import { 
   Newspaper, 
   Search, 
@@ -69,6 +72,8 @@ export default function MarketOverviewPage() {
   const [nextUpdateTime, setNextUpdateTime] = useState<Date>(new Date(Date.now() + 5 * 60 * 1000))
   const [timeUntilUpdate, setTimeUntilUpdate] = useState<string>('5:00')
   const [displayedNewsCount, setDisplayedNewsCount] = useState<number>(5)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [selectedNewsForGeneration, setSelectedNewsForGeneration] = useState<NewsItem | null>(null)
 
   // AI設定を取得する関数
   const getCurrentAIConfig = () => {
@@ -275,13 +280,8 @@ export default function MarketOverviewPage() {
   }, [searchQuery, selectedImportance])
 
   const handleGenerateArticle = (newsItem: NewsItem) => {
-    const params = new URLSearchParams({
-      topic: newsItem.title,
-      source: 'news',
-      newsId: newsItem.id
-    })
-    router.push(`/workbench?${params.toString()}`)
-    toast.success(`「${newsItem.title}」から記事を生成します`)
+    setSelectedNewsForGeneration(newsItem)
+    setIsSheetOpen(true)
   }
 
   const handleLoadMoreNews = () => {
@@ -737,6 +737,25 @@ export default function MarketOverviewPage() {
         </div>
 
       </div>
+
+      {/* 記事生成用Sheet */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg bg-slate-900 border-slate-800">
+          <SheetHeader>
+            <SheetTitle className="text-white">記事を生成</SheetTitle>
+            <SheetDescription className="text-slate-400">
+              選択したニュースから記事を生成します
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+            {selectedNewsForGeneration && (
+              <NewsBasedArticleGenerationForm 
+                newsItems={[selectedNewsForGeneration]}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

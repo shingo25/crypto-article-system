@@ -44,6 +44,9 @@ export async function csrfFetch(
     options.headers = headers
   }
   
+  // 認証情報（Cookie）をリクエストに含める
+  options.credentials = 'include'
+  
   return fetch(url, options)
 }
 

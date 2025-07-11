@@ -14,7 +14,9 @@ const ENCRYPTED_FIELDS = {
   AIProviderSettings: ['apiKey']
 }
 
-// 暗号化ミドルウェアの設定
+// 暗号化ミドルウェアの設定（一時的に無効化）
+// 問題: 重複暗号化エラーのため、アプリケーションレベルでの暗号化に戻します
+/*
 prisma.$use(async (params, next) => {
   // 暗号化が必要なモデルかチェック
   if (params.model && ENCRYPTED_FIELDS[params.model as keyof typeof ENCRYPTED_FIELDS]) {
@@ -60,6 +62,7 @@ prisma.$use(async (params, next) => {
   
   return result
 })
+*/
 
 // 復号化ヘルパー関数
 function decryptResult(result: any, encryptedFields: string[]) {

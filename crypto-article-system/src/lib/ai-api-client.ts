@@ -92,19 +92,28 @@ export async function fetchAiSettings(): Promise<AIProviderSetting[]> {
  * AI設定を保存/更新
  */
 export async function saveAiSetting(setting: AIProviderSettingInput): Promise<AIProviderSetting> {
+  console.log('=== saveAiSetting called ===')
+  console.log('Setting data:', {
+    ...setting,
+    apiKey: setting.apiKey ? `${setting.apiKey.substring(0, 10)}... (length: ${setting.apiKey.length})` : 'undefined'
+  })
+  
   const response = await apiClient.post('/users/ai-settings', setting)
 
   if (!response.ok) {
     const errorData = await response.json()
+    console.error('API response error:', errorData)
     throw new Error(errorData.error || 'AI設定の保存に失敗しました')
   }
 
   const data: ApiResponse<AIProviderSetting> = await response.json()
   
   if (!data.success) {
+    console.error('API response not successful:', data)
     throw new Error(data.error || 'AI設定の保存に失敗しました')
   }
 
+  console.log('=== saveAiSetting success ===')
   return data.data!
 }
 

@@ -14,12 +14,14 @@ import {
   Settings,
   Brain,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  FileText
 } from 'lucide-react'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { TopicColumn } from './TopicColumn'
 import { GenerationColumn } from './GenerationColumn'
 import { PreviewColumn } from './PreviewColumn'
+import { ArticleManagementColumn } from './ArticleManagementColumn'
 import { getActiveProviderInfo } from '@/lib/ai-config'
 import { UserGuide } from '@/components/guidance/UserGuide'
 
@@ -73,12 +75,17 @@ export function WorkspaceLayout({
     return () => clearInterval(interval)
   }, [])
 
-  const getColumnWidth = (column: 'left' | 'center' | 'right') => {
+  const getColumnWidth = (column: 'left' | 'center' | 'right' | 'articles') => {
     if (isFullscreen) {
       if (activeColumn === 'topics' && column === 'left') return 'col-span-12'
       if (activeColumn === 'generation' && column === 'center') return 'col-span-12'
       if (activeColumn === 'preview' && column === 'right') return 'col-span-12'
+      if (activeColumn === 'articles' && column === 'articles') return 'col-span-12'
       return 'hidden'
+    }
+
+    if (activeColumn === 'articles') {
+      return column === 'articles' ? 'col-span-12' : 'hidden'
     }
 
     if (isLeftCollapsed && isRightCollapsed) {
@@ -196,6 +203,17 @@ export function WorkspaceLayout({
           <Settings className="h-4 w-4" />
         </NeuralButton>
 
+        <div className="w-px h-6 bg-neural-elevated mx-2" />
+
+        <NeuralButton
+          variant={activeColumn === 'articles' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveColumn('articles')}
+          title="記事管理"
+        >
+          <FileText className="h-4 w-4" />
+        </NeuralButton>
+
         <UserGuide 
           trigger={
             <NeuralButton
@@ -291,6 +309,22 @@ export function WorkspaceLayout({
             <PreviewColumn />
           </div>
         </div>
+
+        {/* Article Management Column */}
+        <div className={cn(
+          "bg-neural-void flex flex-col",
+          getColumnWidth('articles')
+        )}>
+          <ColumnHeader
+            title="記事管理"
+            icon={() => <div className="w-4 h-4 rounded-full bg-neural-warning" />}
+            isActive={activeColumn === 'articles'}
+            onClick={() => setActiveColumn('articles')}
+          />
+          <div className="flex-1 overflow-hidden">
+            <ArticleManagementColumn />
+          </div>
+        </div>
       </div>
 
       {/* Mobile Tab Navigation - 画面幅が狭い時のみ表示 */}
@@ -299,7 +333,8 @@ export function WorkspaceLayout({
           {[
             { key: 'topics', label: 'Topics', color: 'bg-neural-success' },
             { key: 'generation', label: '記事生成', color: 'bg-neural-cyan' },
-            { key: 'preview', label: 'Preview', color: 'bg-neural-orchid' }
+            { key: 'preview', label: 'Preview', color: 'bg-neural-orchid' },
+            { key: 'articles', label: '記事管理', color: 'bg-neural-warning' }
           ].map(({ key, label, color }) => (
             <button
               key={key}

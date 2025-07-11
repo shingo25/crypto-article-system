@@ -86,8 +86,10 @@ async function loginHandler(request: NextRequest) {
       }
     });
 
-    // HttpOnly Cookieとしてトークンを設定（__Host-プレフィックス付き）
-    response.cookies.set('__Host-auth-token', token, {
+    // HttpOnly Cookieとしてトークンを設定
+    // 開発環境では__Host-プレフィックスを使用しない（secureが必須のため）
+    const cookieName = process.env.NODE_ENV === 'production' ? '__Host-auth-token' : 'auth-token';
+    response.cookies.set(cookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

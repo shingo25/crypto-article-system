@@ -89,9 +89,9 @@ export interface WorkspaceState {
   startGeneration: () => Promise<void>
 
   // UI State
-  activeColumn: 'topics' | 'generation' | 'preview'
+  activeColumn: 'topics' | 'generation' | 'preview' | 'articles'
   previewMode: 'edit' | 'preview' | 'split'
-  setActiveColumn: (column: 'topics' | 'generation' | 'preview') => void
+  setActiveColumn: (column: 'topics' | 'generation' | 'preview' | 'articles') => void
   setPreviewMode: (mode: 'edit' | 'preview' | 'split') => void
 
   // Actions

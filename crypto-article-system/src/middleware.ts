@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withCSRFProtection } from '@/lib/csrf-middleware'
+
+// デバッグ用ログ
+console.log('[MIDDLEWARE] Loading middleware.ts')
 
 // Edge Runtime対応のレート制限（Redis依存を完全に除去）
 async function checkRateLimitSafely(ip: string, windowMs: number, maxRequests: number): Promise<{ allowed: boolean; remaining?: number; resetTime?: number }> {
@@ -41,10 +45,15 @@ function getClientIP(request: NextRequest): string {
   return 'unknown'
 }
 
-export async function middleware(request: NextRequest) {
+async function handleMiddleware(request: NextRequest) {
   try {
     const clientIP = getClientIP(request)
-    const { pathname, method } = request.nextUrl
+    const { pathname } = request.nextUrl
+    const method = request.method
+    
+    // デバッグ用ログ
+    console.log(`[ROOT MIDDLEWARE] Received ${method} request for ${pathname}`)
+    console.log(`[ROOT MIDDLEWARE] Client IP: ${clientIP}`)
     
     // CSP用のnonceを生成
     const nonce = crypto.randomUUID().replace(/-/g, '')
@@ -73,48 +82,7 @@ export async function middleware(request: NextRequest) {
       }
     }
     
-    // CSRF保護: 状態変更リクエストに対するOrigin/Referer検証
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase()) && pathname.startsWith('/api/')) {
-      const origin = request.headers.get('Origin')
-      const referer = request.headers.get('Referer')
-      const host = request.headers.get('Host')
-      
-      // 期待されるオリジン
-      const allowedOrigin = request.nextUrl.protocol === 'https:' 
-        ? `https://${host}` 
-        : `http://${host}`
-      
-      // Origin または Referer のどちらかが正しいオリジンと一致する必要がある
-      let isValidOrigin = false
-      
-      if (origin) {
-        isValidOrigin = origin === allowedOrigin
-      } else if (referer) {
-        try {
-          const refererUrl = new URL(referer)
-          isValidOrigin = refererUrl.origin === allowedOrigin
-        } catch (e) {
-          // Refererが不正なURLの場合は拒否
-          isValidOrigin = false
-        }
-      }
-      
-      if (!isValidOrigin) {
-        console.warn(`CSRF check failed: Invalid Origin/Referer. Origin: ${origin}, Referer: ${referer}, Expected: ${allowedOrigin}`)
-        return new NextResponse(
-          JSON.stringify({
-            error: 'CSRF Validation Failed',
-            message: 'Invalid request origin'
-          }),
-          {
-            status: 403,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        )
-      }
-    }
+    // CSRF保護はwithCSRFProtectionミドルウェアで処理される
     
     const response = NextResponse.next()
     
@@ -174,12 +142,12 @@ export async function middleware(request: NextRequest) {
   }
 }
 
-// より安全なmatcher設定
+// CSRF保護ミドルウェアでラップ
+export const middleware = withCSRFProtection(handleMiddleware)
+
 export const config = {
   matcher: [
-    // APIルートのみ
+    // APIルートにのみミドルウェアを適用
     '/api/:path*',
-    // 静的ファイル、Next.js内部ファイル、ファビコンを除外
-    '/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|sitemap.xml|robots.txt).*)',
   ]
 }

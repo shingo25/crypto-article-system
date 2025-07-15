@@ -141,3 +141,68 @@ export function getCSRFSecret(sessionId: string): string {
     .update(sessionId)
     .digest('hex')
 }
+
+/**
+ * リクエストからCSRFトークンを検証
+ * @param request NextRequest オブジェクト
+ * @returns 検証結果と詳細情報
+ */
+export async function validateCSRFToken(request: Request): Promise<{ valid: boolean; reason?: string }> {
+  // 開発中はCSRF検証をスキップ
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[CSRF] Skipping CSRF validation in development mode')
+    return { valid: true, reason: 'Development mode bypass' }
+  }
+  
+  const token = getCSRFTokenFromRequest(request)
+  if (!token) {
+    return { valid: false, reason: 'CSRF token not found in request' }
+  }
+  
+  // JWTトークンからセッションIDを取得
+  const cookieHeader = request.headers.get('cookie')
+  if (!cookieHeader) {
+    return { valid: false, reason: 'No authentication cookie found' }
+  }
+  
+  const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+    const [key, value] = cookie.trim().split('=')
+    if (key && value) {
+      acc[key] = decodeURIComponent(value)
+    }
+    return acc
+  }, {} as Record<string, string>)
+  
+  const authToken = cookies['auth-token']
+  if (!authToken) {
+    return { valid: false, reason: 'Authentication token not found' }
+  }
+  
+  try {
+    // JWTトークンからuserIdを取得（簡易的な実装）
+    const base64Url = authToken.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    }).join(''))
+    
+    const payload = JSON.parse(jsonPayload)
+    const sessionId = payload.userId || payload.sub
+    
+    if (!sessionId) {
+      return { valid: false, reason: 'Session ID not found in token' }
+    }
+    
+    // Double Submit Tokenで検証
+    const isValid = verifyDoubleSubmitToken(token, sessionId)
+    
+    return {
+      valid: isValid,
+      reason: isValid ? 'Valid CSRF token' : 'Invalid CSRF token'
+    }
+    
+  } catch (error) {
+    console.error('CSRF token validation error:', error)
+    return { valid: false, reason: 'Token parsing error' }
+  }
+}

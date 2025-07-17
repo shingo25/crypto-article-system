@@ -1,0 +1,125 @@
+# AI Article Generation Template Specification v2
+
+version: "2.0"
+metadata:
+  name: "Crypto Article Template"
+  description: "Template specification for AI-powered cryptocurrency article generation"
+  created: "2024-01-26"
+
+## Template Structure
+
+template:
+  id: string
+  name: string
+  description: string
+  version: string
+  article_type: enum[breaking_news, price_analysis, technical_analysis, project_update, educational, market_overview]
+
+## Content Configuration
+
+content:
+  min_words: integer
+  max_words: integer
+  tone: enum[professional, casual, analytical, educational, urgent]
+  style: enum[news, blog, report, tutorial, analysis]
+  language: enum[en, ja]
+
+## AI Generation Settings
+
+ai_config:
+  provider: enum[openai, gemini, claude]
+  model: string
+  temperature: float # 0.0-1.0
+  max_tokens: integer
+  presence_penalty: float # -2.0-2.0
+  frequency_penalty: float # -2.0-2.0
+
+## Content Structure
+
+structure:
+  sections:
+    - type: enum[title, introduction, body, conclusion, summary, cta]
+      required: boolean
+      min_words: integer
+      max_words: integer
+      prompts:
+        - string
+
+## Data Requirements
+
+data_requirements:
+  required_fields:
+    - field_name: string
+      field_type: enum[string, number, date, url, array]
+      description: string
+      validation: string # regex or validation rule
+
+  optional_fields:
+    - field_name: string
+      field_type: enum[string, number, date, url, array]
+      description: string
+      default_value: any
+
+## SEO Configuration
+
+seo:
+  meta_title_template: string
+  meta_description_template: string
+  keywords:
+    - string
+  focus_keyword: string
+
+## Publishing Rules
+
+publishing:
+  wordpress_settings:
+    status: enum[draft, publish, private]
+    categories: array[string]
+    tags: array[string]
+    author_id: integer
+    featured_image_prompt: string
+
+  scheduling:
+    preferred_time: string # HH:MM format
+    timezone: string
+    avoid_weekends: boolean
+
+## Quality Checks
+
+quality_checks:
+  fact_checking:
+    enabled: boolean
+    min_confidence: float # 0.0-1.0
+    require_citations: boolean
+
+  content_scoring:
+    min_readability_score: integer # 0-100
+    max_keyword_density: float # percentage
+    require_unique_content: boolean
+
+  compliance:
+    avoid_financial_advice: boolean
+    require_disclaimer: boolean
+    prohibited_terms:
+      - string
+
+## Post-Processing
+
+post_processing:
+  html_formatting: boolean
+  add_internal_links: boolean
+  add_external_links: boolean
+  image_generation:
+    enabled: boolean
+    provider: enum[dall-e, midjourney, stable-diffusion]
+    style: string
+
+## Monitoring
+
+monitoring:
+  track_performance: boolean
+  analytics_tags:
+    - string
+  success_metrics:
+    - metric_name: string
+      threshold: number

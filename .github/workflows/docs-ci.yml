@@ -34,7 +34,7 @@ jobs:
 
     - name: Lint Markdown files
       run: |
-        markdownlint 'docs/**/*.md' 'templates/**/*.md' --config .markdownlint.json || true
+        markdownlint 'docs/**/*.md' --config .markdownlint.json || true
 
     - name: Validate Mermaid diagrams
       run: |
@@ -78,13 +78,16 @@ jobs:
         # Check that all internal links resolve
         for file in $(find docs -name "*.md"); do
           echo "Checking links in $file"
-          grep -Eo '\[([^]]+)\]\(([^)]+)\)' "$file" | grep -Eo '\(([^)]+)\)' | tr -d '()' | while read link; do
-            if [[ $link == /* ]] || [[ $link == http* ]] || [[ $link == #* ]]; then
+          # Use perl for more reliable regex matching
+          perl -ne 'while (/\[([^\]]+)\]\(([^\)]+)\)/g) { print "$2\n"; }' "$file" | while read link; do
+            if [[ "$link" == /* ]] || [[ "$link" == http* ]] || [[ "$link" == "#"* ]]; then
               continue
             fi
             # Resolve relative links
             dir=$(dirname "$file")
             target="$dir/$link"
+            # Remove anchor if present
+            target="${target%%#*}"
             if [[ ! -f "$target" ]] && [[ ! -f "${target}.md" ]]; then
               echo "Error: Broken link in $file: $link"
               exit 1
@@ -96,27 +99,27 @@ jobs:
       run: |
         python -m pip install pyyaml
         python -c "
-        import yaml
-        import sys
-        import glob
+import yaml
+import sys
+import glob
 
-        errors = []
-        for file in glob.glob('templates/**/*.yaml', recursive=True):
-            try:
-                with open(file, 'r') as f:
-                    yaml.safe_load(f)
-                print(f'✓ {file}')
-            except Exception as e:
-                errors.append(f'✗ {file}: {e}')
+errors = []
+for file in glob.glob('templates/**/*.yaml', recursive=True):
+    try:
+        with open(file, 'r') as f:
+            yaml.safe_load(f)
+        print(f'✓ {file}')
+    except Exception as e:
+        errors.append(f'✗ {file}: {e}')
 
-        if errors:
-            print('\nErrors found:')
-            for error in errors:
-                print(error)
-            sys.exit(1)
-        else:
-            print('\nAll YAML files are valid!')
-        "
+if errors:
+    print('\nErrors found:')
+    for error in errors:
+        print(error)
+    sys.exit(1)
+else:
+    print('\nAll YAML files are valid!')
+"
 
     - name: Check documentation completeness
       run: |
@@ -182,7 +185,7 @@ jobs:
   # Create .markdownlint.json if it doesn't exist
   create-markdownlint-config:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
     - uses: actions/checkout@v4
@@ -190,7 +193,7 @@ jobs:
     - name: Create .markdownlint.json
       run: |
         if [ ! -f .markdownlint.json ]; then
-          cat > .markdownlint.json << 'EOF'
+          cat > .markdownlint.json << 'MDLINTEOF'
         {
           "default": true,
           "MD013": {
@@ -204,7 +207,7 @@ jobs:
           "MD041": false,
           "no-hard-tabs": false
         }
-        EOF
+        MDLINTEOF
 
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"

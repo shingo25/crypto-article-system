@@ -83,25 +83,33 @@ credentials/
 *.backup
 
 # Node.js (Frontend)
-crypto-article-system/node_modules/
-crypto-article-system/.next/
-crypto-article-system/out/
-crypto-article-system/.env.local
-crypto-article-system/.env.development.local
-crypto-article-system/.env.test.local
-crypto-article-system/.env.production.local
-crypto-article-system/npm-debug.log*
-crypto-article-system/yarn-debug.log*
-crypto-article-system/yarn-error.log*
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Legacy frontend directory (cleanup)
+frontend/crypto-article-system/node_modules/
+frontend/crypto-article-system/.next/
+frontend/crypto-article-system/out/
 
 # Keep important config files
-!crypto-article-system/package.json
-!crypto-article-system/package-lock.json
-!crypto-article-system/tsconfig.json
-!crypto-article-system/components.json
-!crypto-article-system/next-env.d.ts
-!crypto-article-system/src/lib/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/tsconfig.json
+!frontend/components.json
+!frontend/next-env.d.ts
+!frontend/src/
 
 # Package files
 *.tar.gz
 *.zip
+
+# Exclude crypto-article-system directory completely
+frontend/crypto-article-system/

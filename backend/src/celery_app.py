@@ -12,9 +12,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Import your modules
-from src.article_pipeline import ArticlePipeline
-from src.topic_collector import TopicCollector
-from src.crypto_article_generator_mvp import (
+from .article_pipeline import ArticlePipeline
+from .topic_collector import TopicCollector
+from .crypto_article_generator_mvp import (
     ArticleType, ArticleDepth, GeneratedArticle
 )
 

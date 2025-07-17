@@ -24,24 +24,24 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 # 自作モジュール
-from src.article_pipeline import ArticlePipeline, PipelineConfig
-from src.topic_collector import TopicManager, RSSFeedCollector, PriceDataCollector
-from src.crypto_article_generator_mvp import CryptoArticleGenerator, ArticleTopic, ArticleType, ArticleDepth
-from src.fact_checker import FactChecker
-from src.wordpress_publisher import WordPressClient, ArticlePublisher
-from src.config_manager import get_config_manager, ConfigValidator
-from src.database import (
+from .article_pipeline import ArticlePipeline, PipelineConfig
+from .topic_collector import TopicManager, RSSFeedCollector, PriceDataCollector
+from .crypto_article_generator_mvp import CryptoArticleGenerator, ArticleTopic, ArticleType, ArticleDepth
+from .fact_checker import FactChecker
+from .wordpress_publisher import WordPressClient, ArticlePublisher
+from .config_manager import get_config_manager, ConfigValidator
+from .database import (
     get_db, Topic, Article, FactCheckResult, GenerationTask, SystemMetrics, ArticleTemplate,
     DatabaseUtils, create_tables
 )
-from celery_app import app as celery_app, generate_article_async, collect_topics_async
-from scheduler import get_scheduler, start_scheduler, stop_scheduler, get_scheduler_status
+from .celery_app import app as celery_app, generate_article_async, collect_topics_async
+from .scheduler import get_scheduler, start_scheduler, stop_scheduler, get_scheduler_status
 
 # 認証関連モジュール
-from src.auth_models import User, APIKey
-from src.auth_service import AuthService
-from src.auth_routes import router as auth_router
-from src.auth_middleware import (
+from .auth_models import User, APIKey
+from .auth_service import AuthService
+from .auth_routes import router as auth_router
+from .auth_middleware import (
     AuthenticationMiddleware, SecurityHeadersMiddleware, IPWhitelistMiddleware,
     get_current_user_from_request, require_permissions, rate_limit_handler,
     validate_jwt_config, limiter

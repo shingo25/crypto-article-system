@@ -20,9 +20,9 @@ if [ ! -f "venv/bin/activate" ]; then
 fi
 
 # Node.jsの準備確認
-if [ ! -d "crypto-article-system/node_modules" ]; then
+if [ ! -d "frontend/node_modules" ]; then
     echo "📦 Node.js依存関係をインストール中..."
-    cd crypto-article-system
+    cd frontend
     npm install
     cd ..
 fi
@@ -32,9 +32,9 @@ if [ ! -f ".env" ]; then
     echo "⚠️  .envファイルが見つかりません。config/.env.exampleからコピーしてください。"
 fi
 
-if [ ! -f "crypto-article-system/.env.local" ]; then
+if [ ! -f "frontend/.env.local" ]; then
     echo "📝 フロントエンド用環境変数を作成中..."
-    echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > crypto-article-system/.env.local
+    echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > frontend/.env.local
 fi
 
 # tmuxが利用可能か確認
@@ -52,11 +52,11 @@ if command -v tmux &> /dev/null; then
     tmux send-keys -t crypto-dev:0 "cd $PROJECT_DIR" C-m
     tmux send-keys -t crypto-dev:0 "source venv/bin/activate" C-m
     tmux send-keys -t crypto-dev:0 "echo '🔥 バックエンドAPIサーバーを起動中...'" C-m
-    tmux send-keys -t crypto-dev:0 "PYTHONPATH=. python api_server.py" C-m
+    tmux send-keys -t crypto-dev:0 "cd backend && PYTHONPATH=. python src/main.py" C-m
     
     # フロントエンド用のウィンドウ
     tmux new-window -t crypto-dev:1 -n 'frontend'
-    tmux send-keys -t crypto-dev:1 "cd $PROJECT_DIR/crypto-article-system" C-m
+    tmux send-keys -t crypto-dev:1 "cd $PROJECT_DIR/frontend" C-m
     tmux send-keys -t crypto-dev:1 "echo '⚡ フロントエンドを起動中...'" C-m
     tmux send-keys -t crypto-dev:1 "sleep 3" C-m  # バックエンドの起動を待つ
     tmux send-keys -t crypto-dev:1 "npm run dev" C-m
@@ -88,10 +88,10 @@ else
     echo "ターミナル1 (バックエンド):"
     echo "  cd $PROJECT_DIR"
     echo "  source venv/bin/activate"
-    echo "  PYTHONPATH=. python api_server.py"
+    echo "  cd backend && PYTHONPATH=. python src/main.py"
     echo ""
     echo "ターミナル2 (フロントエンド):"
-    echo "  cd $PROJECT_DIR/crypto-article-system"
+    echo "  cd $PROJECT_DIR/frontend"
     echo "  npm run dev"
     echo ""
     echo "tmuxをインストールすると自動起動できます："

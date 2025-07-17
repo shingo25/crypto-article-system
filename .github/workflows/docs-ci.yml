@@ -4,14 +4,17 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'docs/'
-      - 'templates/'
+      - 'docs/**'
+      - 'templates/**'
+      - '**.md'
       - '.github/workflows/docs-ci.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'docs/'
-      - 'templates/'
+      - 'docs/**'
+      - 'templates/**'
+      - '**.md'
+      - '.github/workflows/docs-ci.yml'
 
 jobs:
   validate-docs:

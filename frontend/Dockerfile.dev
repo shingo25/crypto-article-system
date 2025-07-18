@@ -1,0 +1,28 @@
+# 開発環境用Dockerfile
+FROM node:20-alpine AS dev
+
+# 必要なパッケージをインストール
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++ \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# package.jsonとpackage-lock.jsonをコピー
+COPY package*.json ./
+
+# 依存関係をインストール
+RUN npm ci
+
+# ソースコードをコピー（ボリュームマウントで上書きされる）
+COPY . .
+
+# 開発用ポートを公開
+EXPOSE 3000
+
+# 開発サーバーを起動
+CMD ["npm", "run", "dev"]

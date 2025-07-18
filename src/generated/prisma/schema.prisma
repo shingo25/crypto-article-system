@@ -1,0 +1,434 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// マルチテナント対応: 組織モデル
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // URL フレンドリーな識別子
+  domain    String? // カスタムドメイン（例: company.com）
+  settings  Json? // 組織固有の設定
+  plan      String   @default("free") // プランタイプ
+  maxUsers  Int      @default(10) // ユーザー数制限
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // リレーション
+  memberships        OrganizationMembership[]
+  articles           Article[]
+  templates          Template[]
+  aiProviderSettings AIProviderSettings[]
+  alertSettings      AlertSettings[]
+  analytics          ArticleAnalytics[]
+
+  @@map("organizations")
+}
+
+// ユーザーと組織の多対多関係
+model OrganizationMembership {
+  id             String     @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MemberRole @default(MEMBER) // 組織内での役割
+  isActive       Boolean    @default(true)
+  joinedAt       DateTime   @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("organization_memberships")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  username        String    @unique
+  password        String
+  firstName       String?
+  lastName        String?
+  avatar          String?
+  role            UserRole  @default(USER)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  emailVerified   Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  preferences     Json?
+
+  // MFA (多要素認証) フィールド
+  mfaEnabled     Boolean @default(false)
+  mfaSecret      String? // TOTP シークレット（暗号化して保存）
+  mfaBackupCodes Json? // バックアップコード
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // リレーション
+  memberships        OrganizationMembership[]
+  aiProviderSettings AIProviderSettings[]
+  alertSettings      AlertSettings[]
+  articleVersions    ArticleVersion[]
+  articles           Article[]
+  sessions           UserSession[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model Article {
+  id              String        @id @default(cuid())
+  organizationId  String // マルチテナント対応
+  title           String
+  content         String?
+  summary         String?
+  slug            String        @unique
+  status          ArticleStatus @default(DRAFT)
+  authorId        String?
+  metaTitle       String?
+  metaDescription String?
+  tags            Json?
+  keywords        Json?
+  sourceType      SourceType    @default(MANUAL)
+  sourceData      Json?
+  generatedBy     String?
+  templateId      String?
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  viewCount       Int           @default(0)
+  shareCount      Int           @default(0)
+  engagementRate  Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // リレーション
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  analytics    ArticleAnalytics[]
+  versions     ArticleVersion[]
+  author       User?              @relation(fields: [authorId], references: [id])
+  template     Template?          @relation(fields: [templateId], references: [id])
+
+  @@index([organizationId]) // テナント分離のための高速化
+  @@map("articles")
+}
+
+model Template {
+  id             String    @id @default(cuid())
+  organizationId String // マルチテナント対応
+  name           String
+  description    String?
+  content        String
+  variables      Json
+  category       String?
+  usageCount     Int       @default(0)
+  lastUsedAt     DateTime?
+  isActive       Boolean   @default(true)
+  isSystem       Boolean   @default(false) // システムテンプレートは全組織共有
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // リレーション
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  articles     Article[]
+
+  @@index([organizationId]) // テナント分離のための高速化
+  @@map("templates")
+}
+
+model ArticleVersion {
+  id         String   @id @default(cuid())
+  articleId  String
+  version    Int
+  title      String
+  content    String
+  changes    String?
+  createdAt  DateTime @default(now())
+  authorId   String?
+  changeType String?
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  author     User?    @relation(fields: [authorId], references: [id])
+
+  @@unique([articleId, version])
+  @@map("article_versions")
+}
+
+model ArticleAnalytics {
+  id             String   @id @default(cuid())
+  organizationId String // マルチテナント対応
+  articleId      String
+  date           DateTime
+  views          Int      @default(0)
+  uniqueViews    Int      @default(0)
+  shares         Int      @default(0)
+  comments       Int      @default(0)
+  avgReadTime    Float    @default(0)
+  bounceRate     Float    @default(0)
+  engagementRate Float    @default(0)
+  trafficSources Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // リレーション
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  article      Article      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, date])
+  @@index([organizationId, date]) // テナント別分析用
+  @@map("article_analytics")
+}
+
+model NewsItem {
+  id                  String   @id @default(cuid())
+  title               String
+  summary             String?
+  content             String?
+  url                 String   @unique
+  imageUrl            String?
+  guid                String   @unique
+  source              String
+  author              String?
+  sentiment           Float?
+  importance          Int      @default(1)
+  aiSummary           String?
+  topics              Json?
+  coins               Json?
+  companies           Json?
+  products            Json?
+  technology          Json?
+  market              Json?
+  regulatory          Json?
+  regions             Json?
+  hasGeneratedArticle Boolean  @default(false)
+  generatedArticleId  String?
+  publishedAt         DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("news_items")
+}
+
+model RSSSource {
+  id             String    @id @default(cuid())
+  name           String
+  url            String    @unique
+  category       String
+  description    String?
+  enabled        Boolean   @default(true)
+  lastCollected  DateTime?
+  totalCollected Int       @default(0)
+  status         String    @default("active")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("rss_sources")
+}
+
+model PriceAlert {
+  id            String    @id @default(cuid())
+  coin          String
+  alertType     AlertType
+  condition     Json
+  isActive      Boolean   @default(true)
+  message       String?
+  autoGenerate  Boolean   @default(false)
+  templateId    String?
+  lastTriggered DateTime?
+  triggerCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("price_alerts")
+}
+
+model AlertTrigger {
+  id               String   @id @default(cuid())
+  alertId          String
+  triggerData      Json
+  articleGenerated Boolean  @default(false)
+  articleId        String?
+  triggeredAt      DateTime @default(now())
+
+  @@map("alert_triggers")
+}
+
+model PriceHistory {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  name      String
+  price     Float
+  volume    Float
+  marketCap Float?
+  rank      Int?
+  change1h  Float?
+  change24h Float?
+  change7d  Float?
+  timestamp DateTime @default(now())
+
+  @@index([symbol, timestamp])
+  @@map("price_history")
+}
+
+model AlertHistory {
+  id            Int      @id @default(autoincrement())
+  symbol        String
+  alertType     String
+  level         String
+  title         String
+  description   String
+  changePercent Float?
+  timeframe     String?
+  volume        Float?
+  details       Json?
+  isActive      Boolean  @default(true)
+  dismissed     Boolean  @default(false)
+  timestamp     DateTime @default(now())
+
+  @@index([symbol, timestamp])
+  @@index([level, timestamp])
+  @@map("alert_history")
+}
+
+model MarketIndicators {
+  id             Int      @id @default(autoincrement())
+  totalMarketCap Float
+  btcDominance   Float
+  fearGreedIndex Int?
+  totalVolume24h Float?
+  timestamp      DateTime @default(now())
+
+  @@index([timestamp])
+  @@map("market_indicators")
+}
+
+model AlertSettings {
+  id                    Int      @id @default(autoincrement())
+  organizationId        String // マルチテナント対応
+  userId                String?
+  symbol                String?
+  alertType             String
+  isEnabled             Boolean  @default(true)
+  threshold             Float?
+  cooldownHours         Int      @default(4)
+  maxAlertsPerDay       Int      @default(5)
+  maxGlobalAlertsPerDay Int      @default(50)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // リレーション
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId]) // テナント分離のための高速化
+  @@map("alert_settings")
+}
+
+model AIProviderSettings {
+  id               String     @id @default(cuid())
+  organizationId   String // マルチテナント対応
+  userId           String
+  provider         AIProvider
+  apiKey           String
+  model            String
+  temperature      Float      @default(0.7)
+  maxTokens        Int        @default(4000)
+  topP             Float      @default(1.0)
+  frequencyPenalty Float      @default(0.0)
+  presencePenalty  Float      @default(0.0)
+  advancedSettings Json?
+  isDefault        Boolean    @default(false)
+  isActive         Boolean    @default(true)
+  lastUsed         DateTime?
+  lastModified     DateTime   @updatedAt
+
+  // リレーション
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("ai_provider_settings")
+}
+
+model SystemMetrics {
+  id                String   @id @default(cuid())
+  date              DateTime @unique
+  articlesGenerated Int      @default(0)
+  templatesUsed     Int      @default(0)
+  newsProcessed     Int      @default(0)
+  alertsTriggered   Int      @default(0)
+  apiRequests       Int      @default(0)
+  aiTokensUsed      Int      @default(0)
+  systemUptime      Float    @default(0)
+  avgResponseTime   Float    @default(0)
+  errorCount        Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  @@map("system_metrics")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  AUTHOR
+  USER
+}
+
+// 組織内での役割
+enum MemberRole {
+  OWNER // 組織オーナー（最高権限）
+  ADMIN // 管理者
+  MANAGER // マネージャー
+  EDITOR // 編集者
+  MEMBER // 一般メンバー
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SourceType {
+  MANUAL
+  MARKET
+  ALERT
+  NEWS
+  TEMPLATE
+  AI_SUGGESTED
+}
+
+enum AlertType {
+  PRICE_ABOVE
+  PRICE_BELOW
+  PRICE_CHANGE
+  VOLUME_SURGE
+  TECHNICAL
+}
+
+enum AIProvider {
+  OPENAI
+  CLAUDE
+  GEMINI
+}

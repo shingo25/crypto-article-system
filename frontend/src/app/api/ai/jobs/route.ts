@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
       })
 
       return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+      }
     }
 
     const body = await request.json()

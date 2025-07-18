@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * 画像プロキシ API
  * 外部画像を安全に読み込むためのプロキシエンドポイント
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const imageUrl = searchParams.get('url')

@@ -6,7 +6,7 @@ import { encrypt, maskApiKey } from '@/lib/encryption'
 
 export const runtime = 'nodejs'
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const logs: string[] = []
   
   const log = (message: string) => {

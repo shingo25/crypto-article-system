@@ -6,7 +6,7 @@ import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
 const componentLogger = createComponentLogger('MarketPricesAPI')
 
 // 暗号通貨価格データ取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now()
   
   try {

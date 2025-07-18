@@ -14,7 +14,7 @@ const rollbackRequestSchema = z.object({
 })
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {

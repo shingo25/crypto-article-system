@@ -7,7 +7,7 @@ import { createComponentLogger } from '@/lib/simple-logger'
 const componentLogger = createComponentLogger('ArticleVersionAPI')
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string; versionId: string } }
 ) {
   try {

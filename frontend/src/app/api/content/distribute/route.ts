@@ -6,7 +6,7 @@ import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
 const componentLogger = createComponentLogger('ContentDistributeAPI')
 
 // コンテンツ配信
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const startTime = Date.now()
   
   try {

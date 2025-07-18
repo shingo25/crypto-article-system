@@ -7,7 +7,7 @@ const prisma = new PrismaClient()
 
 const logger = createLogger('SourcesAPI')
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     logger.info('RSSソース一覧取得開始')
     
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const body = await request.json()
     

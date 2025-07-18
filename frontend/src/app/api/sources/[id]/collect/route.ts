@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 const logger = createLogger('CollectAPI')
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

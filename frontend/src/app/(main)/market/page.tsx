@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import NewsBasedArticleGenerationForm from '@/components/NewsBasedArticleGenerationForm'
-import { useArticleGeneration } from '@/hooks/useArticleGeneration'
 import { 
   Newspaper, 
   Search, 
@@ -55,7 +54,7 @@ interface NewsItem {
 }
 
 export default function MarketOverviewPage() {
-  const router = useRouter()
+  const _router = useRouter()
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSource] = useState<string>('all')

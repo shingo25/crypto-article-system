@@ -10,7 +10,7 @@ import { z } from 'zod'
 export const runtime = 'nodejs'
 
 // GET /api/users/ai-settings - 現在のユーザーの全AI設定を取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   return requireAuth(async (req, user) => {
   try {
     const settings = await prisma.aIProviderSettings.findMany({
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/users/ai-settings - 新しいAI設定を作成/更新
-export const POST = async (request: NextRequest) => {
+export const POST = async (_request: NextRequest) => {
   return requireAuth(async (req, user) => {
     console.log('=== AI Settings POST Request ===')
     console.log('User authenticated:', user.userId)

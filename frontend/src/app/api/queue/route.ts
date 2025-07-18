@@ -6,7 +6,7 @@ import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
 const componentLogger = createComponentLogger('QueueAPI')
 
 // キューの統計情報を取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 }
 
 // ジョブを追加
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 }
 
 // キュー管理操作
-export async function PATCH(request: NextRequest) {
+export async function PATCH(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 // 特定のジョブを削除
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   const startTime = Date.now()
   
   try {

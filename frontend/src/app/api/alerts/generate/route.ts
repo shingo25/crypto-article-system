@@ -9,7 +9,7 @@ const logger = createLogger('AlertGenerationAPI')
  * アラート生成API
  * GET: 手動でアラート生成を実行
  */
-export async function GET(request: NextRequest) {
+export async function GET(__request: NextRequest) {
   try {
     logger.info('Manual alert generation requested')
     
@@ -61,9 +61,9 @@ export async function GET(request: NextRequest) {
  * アラートスケジューラーの制御
  * POST: スケジューラーを開始/停止
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    const { action } = await request.json()
+    const { action } = await _request.json()
 
     if (action === 'start') {
       alertScheduler.start()
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 /**
  * アラートスケジューラーの状態取得
  */
-export async function PUT(request: NextRequest) {
+export async function PUT(_request: NextRequest) {
   try {
     const status = alertScheduler.getStatus()
     

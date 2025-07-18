@@ -8,7 +8,7 @@ const componentLogger = createComponentLogger('NewsItemAPI')
 
 // ニュースアイテム詳細取得
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   return requireAuth(async (req, user) => {

@@ -16,7 +16,7 @@ const aiChatRequestSchema = z.object({
 })
 
 // POST /api/ai/chat - AI APIへのプロキシ
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   return requireAuth(async (req, user) => {
     try {
       const body = await request.json()

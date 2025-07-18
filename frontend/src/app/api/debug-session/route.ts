@@ -3,12 +3,12 @@ import { verifyAuth } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('=== Debug Session API Called ===')
   
   try {
     // 認証情報確認
-    const user = await verifyAuth(request)
+    const user = await verifyAuth(_request)
     
     if (!user) {
       return NextResponse.json({

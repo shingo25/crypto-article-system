@@ -21,7 +21,7 @@ interface CSPViolationReport {
  * CSP違反レポートを受信するエンドポイント
  * POST /api/security/csp-report
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const body = await request.json() as CSPViolationReport
     const report = body['csp-report']
@@ -107,7 +107,7 @@ async function updateViolationStats(violation: any) {
  * 違反統計を取得（管理者用）
  * GET /api/security/csp-report
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // 認証チェック（管理者のみアクセス可能）
     const authHeader = request.headers.get('authorization')

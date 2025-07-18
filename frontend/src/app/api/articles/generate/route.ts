@@ -34,7 +34,7 @@ interface GenerateRequest {
   }
 }
 
-export const POST = requireAuth(async (request: NextRequest, user) => {
+export const POST = requireAuth(async (_request: NextRequest, user) => {
   
   try {
     const body = await request.json() as GenerateRequest

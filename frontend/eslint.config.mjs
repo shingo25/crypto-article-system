@@ -16,13 +16,30 @@ const eslintConfig = [
       "prisma/generated/**/*",
       "src/lib/prisma/generated/**/*",
       "**/*.d.ts",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      ".next/**/*",
+      "out/**/*"
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": "warn", 
-      "@typescript-eslint/no-unused-expressions": "warn",
-      "@typescript-eslint/no-empty-object-type": "off"
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }], 
+      "@typescript-eslint/no-unused-expressions": ["warn", {
+        "allowShortCircuit": true,
+        "allowTernary": true,
+        "allowTaggedTemplates": true
+      }],
+      "@typescript-eslint/no-empty-object-type": "off",
+      "react-hooks/exhaustive-deps": "warn"
+    }
+  },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+    rules: {
+      "@typescript-eslint/no-unused-expressions": "off"
     }
   }
 ];

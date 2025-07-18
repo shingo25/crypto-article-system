@@ -3,7 +3,7 @@ import { PrismaClient } from '@/generated/prisma'
 
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('=== Debug Fresh Prisma Client ===')
   
   try {

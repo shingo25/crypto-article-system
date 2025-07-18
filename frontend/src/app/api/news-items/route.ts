@@ -7,7 +7,7 @@ import { createComponentLogger } from '@/lib/simple-logger'
 const componentLogger = createComponentLogger('NewsItemsAPI')
 
 // ニュースアイテム一覧取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   // 一時的に認証を無効化してテスト
   try {
     const { searchParams } = new URL(request.url)

@@ -6,7 +6,7 @@ import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
 const componentLogger = createComponentLogger('TenantAPI')
 
 // テナント情報取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 }
 
 // テナント作成
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 }
 
 // テナント更新
-export async function PATCH(request: NextRequest) {
+export async function PATCH(_request: NextRequest) {
   const startTime = Date.now()
   
   try {

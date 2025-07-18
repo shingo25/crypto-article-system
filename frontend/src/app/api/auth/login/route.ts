@@ -12,7 +12,7 @@ const loginSchema = z.object({
   password: z.string().min(1, 'パスワードを入力してください'),
 });
 
-async function loginHandler(request: NextRequest) {
+async function loginHandler(_request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password } = loginSchema.parse(body);

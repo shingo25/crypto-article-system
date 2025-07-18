@@ -99,7 +99,7 @@ function initializeWebSocketServer(server: SocketServer) {
 }
 
 // Socket.IOエンドポイント - GET/POSTで初期化
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Next.js環境では外部WebSocketサーバーの利用を推奨
     return NextResponse.json({
@@ -118,6 +118,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   return GET(request)
 }

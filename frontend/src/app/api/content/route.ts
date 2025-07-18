@@ -16,7 +16,7 @@ import { z } from 'zod'
 const componentLogger = createComponentLogger('ContentAPI')
 
 // コンテンツ一覧取得
-const getContentHandler = requireAuth(async (request: NextRequest, user) => {
+const getContentHandler = requireAuth(async (_request: NextRequest, user) => {
   const startTime = Date.now()
   
   try {
@@ -96,7 +96,7 @@ const getContentHandler = requireAuth(async (request: NextRequest, user) => {
 })
 
 // コンテンツ登録
-const postContentHandler = requireAuth(async (request: NextRequest, user) => {
+const postContentHandler = requireAuth(async (_request: NextRequest, user) => {
   const startTime = Date.now()
   
   try {

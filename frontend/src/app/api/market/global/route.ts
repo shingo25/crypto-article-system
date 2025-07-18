@@ -21,7 +21,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // CoinGecko API から市場データを取得（タイムアウト8秒）
     const globalResponse = await fetchWithTimeout('https://api.coingecko.com/api/v3/global', {

@@ -119,7 +119,7 @@ export class ExternalAPIManager {
   }
 
   // APIキー認証
-  public async authenticateAPIKey(request: NextRequest): Promise<{
+  public async authenticateAPIKey(_request: NextRequest): Promise<{
     apiKey: APIKey
     rateLimitResult: {
       allowed: boolean
@@ -301,7 +301,7 @@ export class ExternalAPIManager {
   }
 
   // ページネーション解析
-  public parsePaginationParams(request: NextRequest): PaginationParams {
+  public parsePaginationParams(_request: NextRequest): PaginationParams {
     const searchParams = request.nextUrl.searchParams
     
     return {
@@ -313,7 +313,7 @@ export class ExternalAPIManager {
   }
 
   // フィルタ解析
-  public parseFilterParams(request: NextRequest): FilterParams {
+  public parseFilterParams(_request: NextRequest): FilterParams {
     const searchParams = request.nextUrl.searchParams
     
     return {
@@ -391,7 +391,7 @@ export class ExternalAPIManager {
 
   private async checkRateLimit(
     apiKey: APIKey,
-    request: NextRequest
+    _request: NextRequest
   ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
     // クライアントサイドでは使用しない
     throw new Error('このメソッドはサーバーサイドでのみ使用できます')
@@ -541,11 +541,11 @@ export const externalAPIManager = ExternalAPIManager.getInstance()
 // ミドルウェア用のヘルパー関数
 export const withAPIAuth = (
   handler: (
-    request: NextRequest,
+    _request: NextRequest,
     context: { apiKey: APIKey; rateLimitResult: any }
   ) => Promise<Response>
 ) => {
-  return async (request: NextRequest) => {
+  return async (_request: NextRequest) => {
     try {
       const authResult = await externalAPIManager.authenticateAPIKey(request)
       return await handler(request, authResult)

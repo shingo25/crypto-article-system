@@ -11,7 +11,7 @@ import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
 const componentLogger = createComponentLogger('WorkflowAPI')
 
 // ワークフロー一覧取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 }
 
 // ワークフロー開始
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ワークフロー承認/却下
-export async function PATCH(request: NextRequest) {
+export async function PATCH(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -229,7 +229,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 // ワークフロー削除/キャンセル
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   const startTime = Date.now()
   
   try {

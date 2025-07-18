@@ -12,7 +12,7 @@ const registerSchema = z.object({
   lastName: z.string().optional(),
 });
 
-async function registerHandler(request: NextRequest) {
+async function registerHandler(_request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = registerSchema.parse(body);

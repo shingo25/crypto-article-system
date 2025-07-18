@@ -8,7 +8,7 @@ import { AIProvider, PrismaClient } from '@/generated/prisma'
 export const runtime = 'nodejs'
 
 // GET /api/users/ai-settings/test - テスト用にAPIキーを復号化して返す
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('=== Environment Check ===')
   console.log('ENCRYPTION_KEY exists:', !!process.env.ENCRYPTION_KEY)
   console.log('ENCRYPTION_KEY length:', process.env.ENCRYPTION_KEY ? process.env.ENCRYPTION_KEY.length : 0)

@@ -4,12 +4,12 @@ import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('=== Debug Test API Called ===')
   
   try {
     // 認証確認
-    const user = await verifyAuth(request)
+    const user = await verifyAuth(_request)
     
     if (!user) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 })

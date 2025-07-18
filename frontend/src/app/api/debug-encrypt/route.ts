@@ -3,7 +3,7 @@ import { encrypt, decrypt } from '@/lib/encryption'
 
 export const runtime = 'nodejs'
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   console.log('=== Debug Encrypt API Called ===')
   
   try {

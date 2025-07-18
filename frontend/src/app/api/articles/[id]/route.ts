@@ -8,7 +8,7 @@ const componentLogger = createComponentLogger('ArticleAPI')
 
 // 記事詳細取得
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   return requireAuth(async (req, user) => {
@@ -156,7 +156,7 @@ export async function GET(
 
 // 記事更新
 export async function PUT(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   return requireAuth(async (req, user) => {
@@ -290,7 +290,7 @@ export async function PUT(
 
 // 記事削除
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   return requireAuth(async (req, user) => {

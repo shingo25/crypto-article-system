@@ -107,7 +107,7 @@ function extractKeywords(title: string, content: string) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const body = await request.json() as SummaryRequest
     

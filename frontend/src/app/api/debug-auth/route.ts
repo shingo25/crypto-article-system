@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('=== Debug Auth API Called ===')
   
   try {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const hostAuthToken = request.cookies.get('__Host-auth-token')?.value
     
     // 認証の試行
-    const user = await verifyAuth(request)
+    const user = await verifyAuth(_request)
     
     return NextResponse.json({
       requestUrl: request.url,

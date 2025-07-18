@@ -6,7 +6,7 @@ import { createComponentLogger } from '@/lib/simple-logger'
 const componentLogger = createComponentLogger('AlertsAPI')
 
 // GET /api/alerts - 最新のアラートを取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '10')
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/alerts/dismiss - アラートを既読にする
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const body = await request.json()
     const { alertId } = body

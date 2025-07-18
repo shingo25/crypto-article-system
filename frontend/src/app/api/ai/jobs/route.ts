@@ -14,9 +14,9 @@ const CreateJobSchema = z.object({
 })
 
 // GET /api/ai/jobs - ジョブ一覧取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const user = await verifyAuth(request)
+    const user = await verifyAuth(_request)
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
@@ -98,9 +98,9 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/ai/jobs - 新しいジョブ作成
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    const user = await verifyAuth(request)
+    const user = await verifyAuth(_request)
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }

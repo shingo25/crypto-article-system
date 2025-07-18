@@ -6,7 +6,7 @@ import { formatApiError, AppError, ErrorType } from '@/lib/error-handler'
 const componentLogger = createComponentLogger('ChannelsAPI')
 
 // 配信チャンネル一覧取得
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now()
   
   try {
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
 }
 
 // 配信チャンネル作成
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const startTime = Date.now()
   
   try {

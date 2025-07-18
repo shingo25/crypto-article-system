@@ -2,9 +2,9 @@ import { NextRequest } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const user = await verifyAuth(request);
+    const user = await verifyAuth(_request);
     
     if (!user) {
       return new Response(JSON.stringify({ error: '認証が必要です' }), {

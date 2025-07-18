@@ -11,7 +11,7 @@ export const runtime = 'nodejs'
 const providerSchema = z.enum(['OPENAI', 'CLAUDE', 'GEMINI'])
 
 // GET /api/users/ai-settings/[provider] - 特定のプロバイダーの設定を取得
-export async function GET(request: NextRequest, { params }: { params: { provider: string } }) {
+export async function GET(_request: NextRequest, { params }: { params: { provider: string } }) {
   return requireAuth(async (req, user) => {
     try {
       const provider = providerSchema.parse(params.provider)
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest, { params }: { params: { provider
 }
 
 // DELETE /api/users/ai-settings/[provider] - 特定のプロバイダーの設定を削除
-export const DELETE = protectCSRF(async (request: NextRequest, { params }: { params: { provider: string } }) => {
+export const DELETE = protectCSRF(async (_request: NextRequest, { params }: { params: { provider: string } }) => {
   return requireAuth(async (req, user) => {
     try {
       const provider = providerSchema.parse(params.provider)

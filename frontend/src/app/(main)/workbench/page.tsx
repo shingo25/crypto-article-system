@@ -7,9 +7,7 @@ import { NeuralInput } from '@/components/neural/NeuralInput'
 import { Badge } from '@/components/ui/badge'
 import { 
   Search,
-  Filter,
   Newspaper,
-  TrendingUp,
   Sparkles,
   Eye,
   Send,
@@ -53,7 +51,7 @@ interface GeneratedArticle {
 }
 
 export default function ArticleWorkbench() {
-  const router = useRouter()
+  const _router = useRouter()
   const searchParams = useSearchParams()
   const [activeSourceTab, setActiveSourceTab] = useState<'rss' | 'trends' | 'topics'>('rss')
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])

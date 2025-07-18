@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 const componentLogger = createComponentLogger('JobStatusAPI')
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
   // 一時的に認証を無効化してテスト

@@ -37,7 +37,7 @@ interface GenerateRequest {
 export const POST = requireAuth(async (_request: NextRequest, user) => {
   
   try {
-    const body = await request.json() as GenerateRequest
+    const body = await _request.json() as GenerateRequest
     
     // リクエストデータを検証
     const validatedData = generateRequestSchema.parse(body)

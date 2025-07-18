@@ -10,7 +10,7 @@ const componentLogger = createComponentLogger('ArticlesAPI')
 export async function GET(_request: NextRequest) {
   return requireAuth(async (req, user) => {
     try {
-      const { searchParams } = new URL(request.url)
+      const { searchParams } = new URL(req.url)
       
       // クエリパラメータを取得
       const page = parseInt(searchParams.get('page') || '1')
@@ -184,5 +184,5 @@ export async function GET(_request: NextRequest) {
         { status: 500 }
       )
     }
-  })(request)
+  })(_request)
 }

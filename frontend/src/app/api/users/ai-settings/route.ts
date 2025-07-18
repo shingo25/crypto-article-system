@@ -57,7 +57,7 @@ export async function GET(_request: NextRequest) {
       { status: 500 }
     )
   }
-})(request)
+})(_request)
 }
 
 // POST /api/users/ai-settings - 新しいAI設定を作成/更新
@@ -67,7 +67,7 @@ export const POST = async (_request: NextRequest) => {
     console.log('User authenticated:', user.userId)
   try {
     console.log('=== AI Settings POST Request Start ===')
-    const body = await request.json()
+    const body = await req.json()
     console.log('Request body received:', { 
       provider: body.provider,
       model: body.model,
@@ -235,5 +235,5 @@ export const POST = async (_request: NextRequest) => {
       { status: 500 }
     )
   }
-  })(request)
+  })(_request)
 }
